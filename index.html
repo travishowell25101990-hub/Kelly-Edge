@@ -215,7 +215,11 @@ function render(){
   $('plToday').title='Uses bet placement time. Legacy bets from before date tracking was added are treated as placed today.';
 
   $('bets').innerHTML=bets.length
-    ? bets.slice().reverse().map(b=>`<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>`).join('')
+    ? bets.slice().reverse().map((b,i)=>{
+        const idx=bets.length-1-i;
+        return `<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}${b.result?' • '+b.result.toUpperCase():''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
+        <button style="width:100%;margin:0 0 10px" onclick="editSettledOdds(${idx})">Edit odds</button>`;
+      }).join('')
     : '<div class="muted small">No settled bets yet.</div>';
 
   $('openBets').innerHTML=openBets.length
@@ -227,7 +231,10 @@ function render(){
           <span><b>${b.s}</b> <span class="muted small">${typeLabel}</span></span>
           <b>${money(displayStake)}</b>
         </div>
-        <button style="width:100%;margin:6px 0 10px" onclick="settleOpen(${idx})">Settle bet</button>`;
+        <div class="grid" style="margin-top:6px">
+          <button onclick="editOpenOdds(${idx})">Edit odds</button>
+          <button onclick="settleOpen(${idx})">Settle bet</button>
+        </div>`;
       }).join('')
     : '<div class="muted small">No live bets. Add a bet above to track it in-play.</div>';
 
@@ -249,6 +256,47 @@ function addOpenBet(){
   if(bt==='ew'){ b.ewf=+$('ewf').value; b.ewp=+$('ewp').value; }
   openBets.push(b);
   $('sel').value='';$('ts').value='';$('to').value='';$('ews').value='';
+  render();
+}
+
+function calcBetPnl(b,r,odds){
+  let pnl=0;
+  if(b.bt==='ew'){
+    const ewStake=b.st/2;
+    const placeOdds=1+(odds-1)*(b.ewf||0.2);
+    if(r==='win') pnl=ewStake*(odds-1)+ewStake*(placeOdds-1);
+    else if(r==='place') pnl=-ewStake+ewStake*(placeOdds-1);
+    else if(r==='loss') pnl=-b.st;
+    else pnl=0;
+  } else {
+    pnl=r==='void'
+      ? 0
+      : (r==='win'
+        ? (b.bt==='back'?b.st*(odds-1):-b.st)
+        : (b.bt==='back'?-b.st:b.st*(odds-1)));
+  }
+  return pnl;
+}
+
+function editOpenOdds(i){
+  const b=openBets[i];
+  const val=prompt('Enter the correct/final odds:',b.o);
+  if(val===null)return;
+  const o=Number(val);
+  if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
+  b.o=o;
+  render();
+}
+
+function editSettledOdds(i){
+  const b=bets[i];
+  if(!b.result){alert('This older bet has no stored result, so its P/L cannot be recalculated safely.');return;}
+  const val=prompt('Enter the correct/final odds:',b.o);
+  if(val===null)return;
+  const o=Number(val);
+  if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
+  b.o=o;
+  b.pnl=calcBetPnl(b,b.result,o);
   render();
 }
 
