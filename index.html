@@ -201,14 +201,16 @@ function addOpenBet(){
 }
 
 function settleOpen(i){
-  let r=prompt('Enter result: WIN or LOSS');
+  let r=prompt('Enter result: WIN, LOSS or VOID');
   if(!r)return;
   r=r.trim().toLowerCase();
-  if(r!=='win'&&r!=='loss')return;
+  if(r!=='win'&&r!=='loss'&&r!=='void')return;
   const b=openBets[i];
-  const pnl=r==='win'
-    ? (b.bt==='back'?b.st*(b.o-1):-b.st)
-    : (b.bt==='back'?-b.st:b.st*(b.o-1));
+  const pnl=r==='void'
+    ? 0
+    : (r==='win'
+      ? (b.bt==='back'?b.st*(b.o-1):-b.st)
+      : (b.bt==='back'?-b.st:b.st*(b.o-1)));
   bets.push({s:b.s,st:b.st,o:b.o,pnl});
   openBets.splice(i,1);
   render();
