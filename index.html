@@ -194,7 +194,7 @@ function render(){
 
 function addOpenBet(){
   let s=$('sel').value.trim(), st=+$('ts').value||0, o=+$('to').value||0, bt=$('bt').value;
-  if(!s||st<=0||o<=1||co<=1)return;
+  if(!s||st<=0||o<=1)return;
   openBets.push({s,st,o,bt,created:Date.now()});
   $('sel').value='';$('ts').value='';$('to').value='';
   render();
