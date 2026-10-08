@@ -174,6 +174,17 @@ function calcArb(){
 }
 let bets=JSON.parse(localStorage.getItem('keBets')||'[]');
 let openBets=JSON.parse(localStorage.getItem('keOpenBets')||'[]');
+// Older settled bets were saved before the tracker stored placement dates.
+// Treat those legacy bets as placed today so they appear in the date-based dashboard.
+let legacyBetsUpdated=false;
+bets=bets.map(b=>{
+  if(!b.date){ legacyBetsUpdated=true; return {...b,date:Date.now()}; }
+  return b;
+});
+if(legacyBetsUpdated) localStorage.setItem('keBets',JSON.stringify(bets));
+// Older settled bets were saved before timestamps were added. Treat them as legacy entries.
+// New bets use the time they were placed for period reporting.
+bets=bets.map(b=>({...b, date:b.date||null}));
 
 function render(){
   let p=bets.reduce((a,b)=>a+b.pnl,0);
@@ -185,7 +196,7 @@ function render(){
 
   const now=Date.now(), day=86400000;
   const validBets=bets.filter(b=>b.date);
-  const periodPnl=(days)=>validBets.filter(b=>now-b.date<days*day).reduce((a,b)=>a+b.pnl,0);
+  const periodPnl=(days)=>validBets.filter(b=>now-b.date<days*day && now-b.date>=0).reduce((a,b)=>a+b.pnl,0);
   const staked=bets.reduce((a,b)=>a+b.st,0);
   $('plToday').textContent=money(periodPnl(1));
   $('pl7').textContent=money(periodPnl(7));
@@ -193,6 +204,7 @@ function render(){
   $('plAll').textContent=money(p);
   $('stakedAll').textContent=money(staked);
   $('roiAll').textContent=(staked?(p/staked*100):0).toFixed(2)+'%';
+  $('plToday').title='Uses bet placement time. Legacy bets from before date tracking was added are treated as placed today.';
 
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map(b=>`<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>`).join('')
@@ -232,7 +244,7 @@ function settleOpen(i){
     : (r==='win'
       ? (b.bt==='back'?b.st*(b.o-1):-b.st)
       : (b.bt==='back'?-b.st:b.st*(b.o-1)));
-  bets.push({s:b.s,st:b.st,o:b.o,pnl,date:Date.now(),result:r});
+  bets.push({s:b.s,st:b.st,o:b.o,pnl,date:b.created||Date.now(),result:r});
   openBets.splice(i,1);
   render();
 }
