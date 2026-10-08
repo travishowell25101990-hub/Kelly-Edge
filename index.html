@@ -104,6 +104,16 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     </div>
 
     <div class="card">
+      <div class="muted small">P/L DASHBOARD</div>
+      <div class="row"><span>Today</span><b id="plToday">£0.00</b></div>
+      <div class="row"><span>Last 7 days</span><b id="pl7">£0.00</b></div>
+      <div class="row"><span>Last 30 days</span><b id="pl30">£0.00</b></div>
+      <div class="row"><span>Total P/L</span><b id="plAll">£0.00</b></div>
+      <div class="row"><span>Total staked</span><b id="stakedAll">£0.00</b></div>
+      <div class="row"><span>ROI</span><b id="roiAll">0.00%</b></div>
+    </div>
+
+    <div class="card">
       <div class="muted small">NEW BET</div>
       <label>Selection / event</label><input id="sel" placeholder="e.g. Suva FC">
       <div class="grid">
@@ -173,6 +183,17 @@ function render(){
   $('openStake').textContent=money(os);
   $('openCount').textContent=openBets.length;
 
+  const now=Date.now(), day=86400000;
+  const validBets=bets.filter(b=>b.date);
+  const periodPnl=(days)=>validBets.filter(b=>now-b.date<days*day).reduce((a,b)=>a+b.pnl,0);
+  const staked=bets.reduce((a,b)=>a+b.st,0);
+  $('plToday').textContent=money(periodPnl(1));
+  $('pl7').textContent=money(periodPnl(7));
+  $('pl30').textContent=money(periodPnl(30));
+  $('plAll').textContent=money(p);
+  $('stakedAll').textContent=money(staked);
+  $('roiAll').textContent=(staked?(p/staked*100):0).toFixed(2)+'%';
+
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map(b=>`<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>`).join('')
     : '<div class="muted small">No settled bets yet.</div>';
@@ -211,7 +232,7 @@ function settleOpen(i){
     : (r==='win'
       ? (b.bt==='back'?b.st*(b.o-1):-b.st)
       : (b.bt==='back'?-b.st:b.st*(b.o-1)));
-  bets.push({s:b.s,st:b.st,o:b.o,pnl});
+  bets.push({s:b.s,st:b.st,o:b.o,pnl,date:Date.now(),result:r});
   openBets.splice(i,1);
   render();
 }
