@@ -24,7 +24,8 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
   <div class="top"><div><h1>Kelly Edge</h1><div class="sub">Betting & trading calculator</div></div></div>
   <div class="tabs">
     <button id="tKelly" class="active" onclick="tab('kelly')">Kelly</button>
-    <button id="tArb" onclick="tab('arb')">Back/Lay</button>
+    <button id="tValue" onclick="tab('value')">Value</button>
+    <button id="tArb" onclick="tab('arb')"> onclick="tab('arb')">Back/Lay</button>
     <button id="tTracker" onclick="tab('tracker')">Tracker</button>
   </div>
 
@@ -43,6 +44,26 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
       <div class="row"><span>Fair odds</span><b id="fair">0.00</b></div>
       <div class="row"><span>EV</span><b id="ev">0.00%</b></div>
       <div class="row"><span>Potential profit</span><b id="profit">£0.00</b></div>
+    </div>
+  </section>
+
+  <section id="value" class="panel" style="display:none">
+    <div class="card">
+      <div class="grid">
+        <div><label>Your probability (%)</label><input id="vp" type="number" value="60" step="0.1" oninput="calcValue()"></div>
+        <div><label>Available odds</label><input id="vo" type="number" value="1.85" step="0.01" oninput="calcValue()"></div>
+      </div>
+      <label>Bankroll (£)</label><input id="vb" type="number" value="500" step="0.01" oninput="calcValue()">
+      <label>Kelly fraction</label>
+      <select id="vf" onchange="calcValue()"><option value="1">Full Kelly</option><option value=".75" selected>¾ Kelly</option><option value=".5">½ Kelly</option><option value=".25">¼ Kelly</option></select>
+    </div>
+    <div class="card">
+      <div class="muted small">Value assessment</div><div class="result" id="vTitle">—</div>
+      <div class="row"><span>Fair odds</span><b id="vFair">0.00</b></div>
+      <div class="row"><span>Implied probability</span><b id="vImp">0.00%</b></div>
+      <div class="row"><span>EV</span><b id="vEv">0.00%</b></div>
+      <div class="row"><span>¾/selected Kelly stake</span><b id="vStake">£0.00</b></div>
+      <div class="row"><span>Profit at odds</span><b id="vProfit">£0.00</b></div>
     </div>
   </section>
 
@@ -91,13 +112,27 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
 <script>
 const $=id=>document.getElementById(id);
 function money(x){return '£'+(Number(x)||0).toFixed(2)}
-function tab(x){['kelly','arb','tracker'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tArb','tTracker'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
+function tab(x){['kelly','value','arb','tracker'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
 function calcKelly(){
  const B=+$('bank').value||0,O=+$('odds').value||0,P=(+$('prob').value||0)/100,F=+$('frac').value;
  if(O<=1){return}
  const fair=P?1/P:0, ev=P*O-1, k=((O-1)*P-(1-P))/(O-1), stake=Math.max(0,B*k*F);
  $('stake').textContent=money(stake);$('fair').textContent=fair.toFixed(2);$('ev').textContent=(ev*100).toFixed(2)+'%';$('ev').className=ev>0?'good':ev<0?'bad':'';
  $('profit').textContent=money(stake*(O-1));
+}
+function calcValue(){
+ const p=(+$('vp').value||0)/100, o=+$('vo').value||0, b=+$('vb').value||0, f=+$('vf').value;
+ if(p<=0||o<=1)return;
+ const fair=1/p, imp=1/o, ev=p*o-1;
+ const k=((o-1)*p-(1-p))/(o-1), stake=Math.max(0,b*k*f);
+ $('vFair').textContent=fair.toFixed(2);
+ $('vImp').textContent=(imp*100).toFixed(2)+'%';
+ $('vEv').textContent=(ev*100).toFixed(2)+'%';
+ $('vEv').className=ev>0?'good':ev<0?'bad':'';
+ $('vStake').textContent=money(stake);
+ $('vProfit').textContent=money(stake*(o-1));
+ $('vTitle').textContent=ev>0?'VALUE BET':ev<0?'NO VALUE':'FAIR PRICE';
+ $('vTitle').className='result '+(ev>0?'good':ev<0?'bad':'warn');
 }
 function calcArb(){
  const bo=+$('bo').value||0,lo=+$('lo').value||0,bs=+$('bs').value||0,c=(+$('comm').value||0)/100;
@@ -112,7 +147,7 @@ let bets=JSON.parse(localStorage.getItem('keBets')||'[]');
 function render(){let p=bets.reduce((a,b)=>a+b.pnl,0);$('count').textContent=bets.length;$('tpl').textContent=money(p);$('bets').innerHTML=bets.length?bets.slice().reverse().map(b=>`<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>`).join(''):'<div class="muted small">No bets recorded yet.</div>';localStorage.setItem('keBets',JSON.stringify(bets))}
 function addBet(){let s=$('sel').value.trim(),st=+$('ts').value||0,o=+$('to').value||0,r=$('res').value;if(!s||st<=0||o<=1)return;let pnl=r==='win'?st*(o-1):-st;bets.push({s,st,o,pnl});$('sel').value='';$('ts').value='';$('to').value='';render()}
 function saveTrack(){localStorage.setItem('keBank',$('tb').value)}
-$('tb').value=localStorage.getItem('keBank')||500;calcKelly();calcArb();render();
+$('tb').value=localStorage.getItem('keBank')||500;calcKelly();calcValue();calcArb();render();
 </script>
 </body>
 </html>
