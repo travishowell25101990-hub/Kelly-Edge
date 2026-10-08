@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101318">
+<title>Kelly Edge</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d1015;color:#f4f6f8;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:520px;margin:auto;padding:18px 14px 40px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{font-size:25px;margin:0}.sub{color:#8f98a5;font-size:12px;margin-top:3px}
+.card{background:#171c24;border:1px solid #252c37;border-radius:16px;padding:16px;margin:12px 0}
+label{display:block;font-size:12px;color:#aeb6c2;margin:10px 0 6px}
+input,select{width:100%;background:#0f1319;color:#fff;border:1px solid #343d49;border-radius:10px;padding:12px;font-size:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+button{border:0;border-radius:10px;padding:11px;background:#252d39;color:#dfe5ec;font-weight:650}
+button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weight:800;margin:4px 0}.muted{color:#8f98a5}.good{color:#70e0a2}.warn{color:#f4c76b}.bad{color:#ff7d87}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #252c37}.row:last-child{border-bottom:0}
+.big{font-size:18px;font-weight:750}.small{font-size:12px}.foot{color:#68717e;font-size:11px;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>Kelly Edge</h1><div class="sub">Betting & trading calculator</div></div></div>
+  <div class="tabs">
+    <button id="tKelly" class="active" onclick="tab('kelly')">Kelly</button>
+    <button id="tArb" onclick="tab('arb')">Back/Lay</button>
+    <button id="tTracker" onclick="tab('tracker')">Tracker</button>
+  </div>
+
+  <section id="kelly" class="panel">
+    <div class="card">
+      <div class="grid">
+        <div><label>Bankroll (£)</label><input id="bank" type="number" value="500" step="0.01" oninput="calcKelly()"></div>
+        <div><label>Odds (decimal)</label><input id="odds" type="number" value="1.72" step="0.01" oninput="calcKelly()"></div>
+      </div>
+      <label>Your probability (%)</label><input id="prob" type="number" value="60" step="0.1" oninput="calcKelly()">
+      <label>Kelly fraction</label>
+      <select id="frac" onchange="calcKelly()"><option value="1">Full Kelly</option><option value=".75" selected>¾ Kelly</option><option value=".5">½ Kelly</option><option value=".25">¼ Kelly</option></select>
+    </div>
+    <div class="card">
+      <div class="muted small">Recommended stake</div><div class="result" id="stake">£0.00</div>
+      <div class="row"><span>Fair odds</span><b id="fair">0.00</b></div>
+      <div class="row"><span>EV</span><b id="ev">0.00%</b></div>
+      <div class="row"><span>Potential profit</span><b id="profit">£0.00</b></div>
+    </div>
+  </section>
+
+  <section id="arb" class="panel" style="display:none">
+    <div class="card">
+      <div class="grid">
+        <div><label>Bookmaker back odds</label><input id="bo" type="number" value="1.72" step="0.01" oninput="calcArb()"></div>
+        <div><label>Exchange lay odds</label><input id="lo" type="number" value="1.68" step="0.01" oninput="calcArb()"></div>
+      </div>
+      <div class="grid">
+        <div><label>Back stake (£)</label><input id="bs" type="number" value="100" step="0.01" oninput="calcArb()"></div>
+        <div><label>Exchange commission (%)</label><input id="comm" type="number" value="5" step="0.1" oninput="calcArb()"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="muted small">Result</div><div class="result" id="arbTitle">—</div>
+      <div class="row"><span>Lay stake</span><b id="ls">£0.00</b></div>
+      <div class="row"><span>Lay liability</span><b id="liab">£0.00</b></div>
+      <div class="row"><span>Profit if selection wins</span><b id="pw">£0.00</b></div>
+      <div class="row"><span>Profit if selection loses</span><b id="pl">£0.00</b></div>
+      <div class="row"><span>Guaranteed ROI</span><b id="roi">0.00%</b></div>
+    </div>
+  </section>
+
+  <section id="tracker" class="panel" style="display:none">
+    <div class="card">
+      <label>Bankroll (£)</label><input id="tb" type="number" value="500" step="0.01" oninput="saveTrack()">
+      <div class="row"><span>Bets recorded</span><b id="count">0</b></div>
+      <div class="row"><span>Total P/L</span><b id="tpl">£0.00</b></div>
+    </div>
+    <div class="card">
+      <div class="grid">
+        <input id="sel" placeholder="Selection">
+        <input id="ts" type="number" placeholder="Stake £" step="0.01">
+      </div>
+      <div class="grid" style="margin-top:8px">
+        <input id="to" type="number" placeholder="Odds" step="0.01">
+        <select id="res"><option value="win">Won</option><option value="loss">Lost</option></select>
+      </div>
+      <button style="width:100%;margin-top:10px" onclick="addBet()">Add bet</button>
+    </div>
+    <div class="card" id="bets"></div>
+  </section>
+  <div class="foot">Calculations are estimates based on the inputs you provide. Always verify live prices and available liquidity.</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function money(x){return '£'+(Number(x)||0).toFixed(2)}
+function tab(x){['kelly','arb','tracker'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tArb','tTracker'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
+function calcKelly(){
+ const B=+$('bank').value||0,O=+$('odds').value||0,P=(+$('prob').value||0)/100,F=+$('frac').value;
+ if(O<=1){return}
+ const fair=P?1/P:0, ev=P*O-1, k=((O-1)*P-(1-P))/(O-1), stake=Math.max(0,B*k*F);
+ $('stake').textContent=money(stake);$('fair').textContent=fair.toFixed(2);$('ev').textContent=(ev*100).toFixed(2)+'%';$('ev').className=ev>0?'good':ev<0?'bad':'';
+ $('profit').textContent=money(stake*(O-1));
+}
+function calcArb(){
+ const bo=+$('bo').value||0,lo=+$('lo').value||0,bs=+$('bs').value||0,c=(+$('comm').value||0)/100;
+ if(bo<=1||lo<=1)return;
+ const lay=bs*bo/lo, liability=lay*(lo-1);
+ const win=bs*(bo-1)-liability; const lose=lay*(1-c)-bs;
+ const g=Math.min(win,lose), roi=g/bs;
+ $('ls').textContent=money(lay);$('liab').textContent=money(liability);$('pw').textContent=money(win);$('pl').textContent=money(lose);$('roi').textContent=(roi*100).toFixed(2)+'%';
+ $('arbTitle').textContent=g>0?'POSITIVE ARB':'No guaranteed arb';$('arbTitle').className='result '+(g>0?'good':'bad');
+}
+let bets=JSON.parse(localStorage.getItem('keBets')||'[]');
+function render(){let p=bets.reduce((a,b)=>a+b.pnl,0);$('count').textContent=bets.length;$('tpl').textContent=money(p);$('bets').innerHTML=bets.length?bets.slice().reverse().map(b=>`<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>`).join(''):'<div class="muted small">No bets recorded yet.</div>';localStorage.setItem('keBets',JSON.stringify(bets))}
+function addBet(){let s=$('sel').value.trim(),st=+$('ts').value||0,o=+$('to').value||0,r=$('res').value;if(!s||st<=0||o<=1)return;let pnl=r==='win'?st*(o-1):-st;bets.push({s,st,o,pnl});$('sel').value='';$('ts').value='';$('to').value='';render()}
+function saveTrack(){localStorage.setItem('keBank',$('tb').value)}
+$('tb').value=localStorage.getItem('keBank')||500;calcKelly();calcArb();render();
+</script>
+</body>
+</html>
