@@ -69,21 +69,26 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
 
   <section id="arb" class="panel" style="display:none">
     <div class="card">
+      <div class="muted small">STEP 1 · ENTER PRICES</div>
       <div class="grid">
-        <div><label>Bookmaker back odds</label><input id="bo" type="number" value="1.72" step="0.01" oninput="calcArb()"></div>
-        <div><label>Exchange lay odds</label><input id="lo" type="number" value="1.68" step="0.01" oninput="calcArb()"></div>
+        <div><label>Bookmaker back</label><input id="bo" type="number" value="1.72" step="0.01" oninput="calcArb()"></div>
+        <div><label>Exchange lay</label><input id="lo" type="number" value="1.68" step="0.01" oninput="calcArb()"></div>
       </div>
       <div class="grid">
         <div><label>Back stake (£)</label><input id="bs" type="number" value="100" step="0.01" oninput="calcArb()"></div>
-        <div><label>Exchange commission (%)</label><input id="comm" type="number" value="5" step="0.1" oninput="calcArb()"></div>
+        <div><label>Commission (%)</label><input id="comm" type="number" value="5" step="0.1" oninput="calcArb()"></div>
       </div>
     </div>
     <div class="card">
-      <div class="muted small">Result</div><div class="result" id="arbTitle">—</div>
+      <div class="muted small">STEP 2 · PLACE THE LAY</div>
+      <div class="result" id="arbTitle">—</div>
       <div class="row"><span>Lay stake</span><b id="ls">£0.00</b></div>
       <div class="row"><span>Lay liability</span><b id="liab">£0.00</b></div>
-      <div class="row"><span>Profit if selection wins</span><b id="pw">£0.00</b></div>
-      <div class="row"><span>Profit if selection loses</span><b id="pl">£0.00</b></div>
+    </div>
+    <div class="card">
+      <div class="muted small">STEP 3 · LOCKED RESULT</div>
+      <div class="row"><span>If selection wins</span><b id="pw">£0.00</b></div>
+      <div class="row"><span>If selection loses</span><b id="pl">£0.00</b></div>
       <div class="row"><span>Guaranteed ROI</span><b id="roi">0.00%</b></div>
     </div>
   </section>
