@@ -121,7 +121,15 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
         <div><label>Entry odds</label><input id="to" type="number" placeholder="1.72" step="0.01"></div>
       </div>
       <div class="grid">
-        <div><label>Bet type</label><select id="bt"><option value="back">Back</option><option value="lay">Lay</option></select></div>
+        <div><label>Bet type</label><select id="bt" onchange="toggleEW()"><option value="back">Back</option><option value="lay">Lay</option><option value="ew">Each Way</option></select></div>
+      </div>
+      <div id="ewFields" style="display:none">
+        <div class="grid">
+          <div><label>Stake each way (£)</label><input id="ews" type="number" placeholder="10" step="0.01"></div>
+          <div><label>Place terms</label><select id="ewf"><option value="0.2">1/5</option><option value="0.25">1/4</option><option value="0.3333333333">1/3</option><option value="0.5">1/2</option></select></div>
+        </div>
+        <label>Places</label><select id="ewp"><option value="2">2 places</option><option value="3">3 places</option><option value="4" selected>4 places</option><option value="5">5 places</option><option value="6">6 places</option></select>
+        <div class="muted small" style="margin-top:8px">For an each-way bet, the stake above is the amount on each part. Total stake = 2 × stake.</div>
       </div>
       <button style="width:100%;margin-top:10px" onclick="addOpenBet()">Add live bet</button>
     </div>
@@ -136,7 +144,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
       <div id="bets"></div>
     </div>
   </section>
-  <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only.</div>
+  <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only. Each-way bets use separate win/place terms and are settled as WIN, PLACE, LOSS or VOID.</div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -188,7 +196,7 @@ bets=bets.map(b=>({...b, date:b.date||null}));
 
 function render(){
   let p=bets.reduce((a,b)=>a+b.pnl,0);
-  let os=openBets.reduce((a,b)=>a+b.st,0);
+  let os=openBets.reduce((a,b)=>a+b.st*(b.bt==='ew'?2:1),0);
   $('count').textContent=bets.length;
   $('tpl').textContent=money(p);
   $('openStake').textContent=money(os);
@@ -213,9 +221,11 @@ function render(){
   $('openBets').innerHTML=openBets.length
     ? openBets.slice().reverse().map((b,i)=>{
         const idx=openBets.length-1-i;
+        const typeLabel=b.bt==='ew'?`EACH WAY • ${b.o.toFixed(2)} • ${b.ewf===0.2?'1/5':b.ewf===0.25?'1/4':b.ewf===0.3333333333?'1/3':b.ewf===0.5?'1/2':(b.ewf||0.2)} • ${b.ewp||4}pl`:`${b.bt.toUpperCase()} • ${b.o.toFixed(2)}`;
+        const displayStake=b.bt==='ew'?b.st*2:b.st;
         return `<div class="row">
-          <span><b>${b.s}</b> <span class="muted small">${b.bt.toUpperCase()} • ${b.o.toFixed(2)}</span></span>
-          <b>${money(b.st)}</b>
+          <span><b>${b.s}</b> <span class="muted small">${typeLabel}</span></span>
+          <b>${money(displayStake)}</b>
         </div>
         <button style="width:100%;margin:6px 0 10px" onclick="settleOpen(${idx})">Settle bet</button>`;
       }).join('')
@@ -225,33 +235,57 @@ function render(){
   localStorage.setItem('keOpenBets',JSON.stringify(openBets));
 }
 
+function toggleEW(){
+  const ew=$('bt').value==='ew';
+  $('ewFields').style.display=ew?'block':'none';
+  $('ts').parentElement.querySelector('label').textContent=ew?'Stake each way (£)':'Stake (£)';
+}
+
 function addOpenBet(){
   let s=$('sel').value.trim(), st=+$('ts').value||0, o=+$('to').value||0, bt=$('bt').value;
+  if(bt==='ew') st=+$('ews').value||0;
   if(!s||st<=0||o<=1)return;
-  openBets.push({s,st,o,bt,created:Date.now()});
-  $('sel').value='';$('ts').value='';$('to').value='';
+  const b={s,st,o,bt,created:Date.now()};
+  if(bt==='ew'){ b.ewf=+$('ewf').value; b.ewp=+$('ewp').value; }
+  openBets.push(b);
+  $('sel').value='';$('ts').value='';$('to').value='';$('ews').value='';
   render();
 }
 
 function settleOpen(i){
-  let r=prompt('Enter result: WIN, LOSS or VOID');
+  const b=openBets[i];
+  const promptText=b.bt==='ew'
+    ? 'Enter result: WIN, PLACE, LOSS or VOID\nWIN = both win & place paid\nPLACE = place part wins, win part loses'
+    : 'Enter result: WIN, LOSS or VOID';
+  let r=prompt(promptText);
   if(!r)return;
   r=r.trim().toLowerCase();
-  if(r!=='win'&&r!=='loss'&&r!=='void')return;
-  const b=openBets[i];
-  const pnl=r==='void'
-    ? 0
-    : (r==='win'
-      ? (b.bt==='back'?b.st*(b.o-1):-b.st)
-      : (b.bt==='back'?-b.st:b.st*(b.o-1)));
-  bets.push({s:b.s,st:b.st,o:b.o,pnl,date:b.created||Date.now(),result:r});
+  const allowed=b.bt==='ew'?['win','place','loss','void']:['win','loss','void'];
+  if(!allowed.includes(r))return;
+
+  let pnl=0, totalStake=b.st;
+  if(b.bt==='ew'){
+    totalStake=b.st*2;
+    const placeOdds=1+(b.o-1)*(b.ewf||0.2);
+    if(r==='win') pnl=b.st*(b.o-1)+b.st*(placeOdds-1);
+    else if(r==='place') pnl=-b.st+b.st*(placeOdds-1);
+    else if(r==='loss') pnl=-totalStake;
+    else pnl=0;
+  } else {
+    pnl=r==='void'
+      ? 0
+      : (r==='win'
+        ? (b.bt==='back'?b.st*(b.o-1):-b.st)
+        : (b.bt==='back'?-b.st:b.st*(b.o-1)));
+  }
+  bets.push({s:b.s,st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,ewf:b.ewf||null,ewp:b.ewp||null});
   openBets.splice(i,1);
   render();
 }
 
 function saveTrack(){localStorage.setItem('keBank',$('tb').value)}
 
-calcKelly();calcValue();calcArb();render();
+calcKelly();calcValue();calcArb();toggleEW();render();
 </script>
 </body>
 </html>
