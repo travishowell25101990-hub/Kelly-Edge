@@ -111,14 +111,13 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
         <div><label>Entry odds</label><input id="to" type="number" placeholder="1.72" step="0.01"></div>
       </div>
       <div class="grid">
-        <div><label>Current odds</label><input id="co" type="number" placeholder="1.72" step="0.01"></div>
         <div><label>Bet type</label><select id="bt"><option value="back">Back</option><option value="lay">Lay</option></select></div>
       </div>
       <button style="width:100%;margin-top:10px" onclick="addOpenBet()">Add live bet</button>
     </div>
 
     <div class="card">
-      <div class="muted small">LIVE / OPEN BETS</div>
+      <div class="muted small">OPEN / IN-PLAY BETS</div>
       <div id="openBets"></div>
     </div>
 
@@ -127,7 +126,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
       <div id="bets"></div>
     </div>
   </section>
-  <div class="foot">Calculations are estimates. Live-bet current odds are entered manually; automatic odds feeds can be added later.</div>
+  <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only.</div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -181,20 +180,11 @@ function render(){
   $('openBets').innerHTML=openBets.length
     ? openBets.slice().reverse().map((b,i)=>{
         const idx=openBets.length-1-i;
-        const cur=+$('co').value||b.co;
-        const currentProfit=b.bt==='back'
-          ? b.st*((cur||b.o)-1)
-          : b.st*(1-1/(cur||b.o));
-        return `<div class="card" style="margin:8px 0;background:#10151c">
-          <div class="big">${b.s}</div>
-          <div class="small muted">${b.bt.toUpperCase()} • Entry ${b.o.toFixed(2)} • £${b.st.toFixed(2)}</div>
-          <div class="row"><span>Current odds</span><b>${b.co.toFixed(2)}</b></div>
-          <div class="row"><span>Unrealised P/L*</span><b class="${currentProfit>=0?'good':'bad'}">${money(currentProfit)}</b></div>
-          <div class="grid" style="margin-top:8px">
-            <button onclick="updateOpen(${idx})">Update odds</button>
-            <button onclick="settleOpen(${idx})">Settle bet</button>
-          </div>
-        </div>`;
+        return `<div class="row">
+          <span><b>${b.s}</b> <span class="muted small">${b.bt.toUpperCase()} • ${b.o.toFixed(2)}</span></span>
+          <b>${money(b.st)}</b>
+        </div>
+        <button style="width:100%;margin:6px 0 10px" onclick="settleOpen(${idx})">Settle bet</button>`;
       }).join('')
     : '<div class="muted small">No live bets. Add a bet above to track it in-play.</div>';
 
@@ -203,16 +193,11 @@ function render(){
 }
 
 function addOpenBet(){
-  let s=$('sel').value.trim(), st=+$('ts').value||0, o=+$('to').value||0, co=+$('co').value||o, bt=$('bt').value;
+  let s=$('sel').value.trim(), st=+$('ts').value||0, o=+$('to').value||0, bt=$('bt').value;
   if(!s||st<=0||o<=1||co<=1)return;
-  openBets.push({s,st,o,co,bt,created:Date.now()});
-  $('sel').value='';$('ts').value='';$('to').value='';$('co').value='';
+  openBets.push({s,st,o,bt,created:Date.now()});
+  $('sel').value='';$('ts').value='';$('to').value='';
   render();
-}
-
-function updateOpen(i){
-  let v=prompt('Enter the latest odds:', openBets[i].co.toFixed(2));
-  if(v!==null && +v>1){openBets[i].co=+v;render();}
 }
 
 function settleOpen(i){
