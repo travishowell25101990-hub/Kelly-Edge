@@ -117,6 +117,8 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <div class="card">
       <div class="muted small">NEW BET</div>
       <label>Selection / event</label><input id="sel" placeholder="e.g. Suva FC">
+    <label>Account placed with</label><select id="betAccount"></select>
+    <label>Account placed with</label><select id="betAccount"></select>
       <div class="grid">
         <div><label>Stake (£)</label><input id="ts" type="number" placeholder="25" step="0.01"></div>
         <div><label>Entry odds</label><input id="to" type="number" placeholder="1.72" step="0.01"></div>
@@ -148,11 +150,39 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
   </section>
 
   <section id="accounts" class="panel" style="display:none">
-    <div class="card"><div class="muted small">ACCOUNT BALANCES</div><div class="result" id="accountsTotal">£530.54</div><div class="muted small">Combined betting-account bankroll</div><div id="accountRows"></div></div>
-    <div class="card"><div class="muted small">EDIT ACCOUNT BALANCE</div><label>Account</label><select id="accountEdit"></select><label>New balance (£)</label><input id="accountBalance" type="number" step="0.01" placeholder="0.00"><button style="width:100%;margin-top:10px" onclick="saveAccountBalance()">Save balance</button><div class="muted small" style="margin-top:8px">Use this to reconcile Kelly Edge with the actual balance shown by the bookmaker or exchange.</div></div>
-    <div class="card"><div class="muted small">BANK BALANCE (KEPT SEPARATE)</div><label>Bank (£)</label><input id="bankBalance" type="number" step="0.01" value="200.47" oninput="saveBankBalance()"><div class="row"><span>Combined funds incl. bank</span><b id="combinedTotal">£731.01</b></div></div>
+    <div class="card">
+      <div class="muted small">OVERALL BANKROLL</div>
+      <div class="result" id="accountsTotal">£731.01</div>
+      <div class="muted small">All betting accounts plus your Bank account</div>
+      <div id="accountRows"></div>
+    </div>
+    <div class="card">
+      <div class="muted small">EDIT ACCOUNT BALANCE</div>
+      <label>Account</label><select id="accountEdit"></select>
+      <label>Actual balance (£)</label><input id="accountBalance" type="number" step="0.01" placeholder="0.00">
+      <button style="width:100%;margin-top:10px" onclick="saveAccountBalance()">Save balance</button>
+      <div class="muted small" style="margin-top:8px">Use this to reconcile Kelly Edge against the actual balance in an account.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">WITHDRAW MONEY FROM YOUR BANKROLL</div>
+      <div class="muted small">Record money removed for day-to-day spending. This reduces the selected account and overall bankroll, but is not counted as a betting loss.</div>
+      <label>Withdraw from account</label><select id="withdrawAccount"></select>
+      <label>Amount (£)</label><input id="withdrawAmount" type="number" min="0.01" step="0.01" placeholder="e.g. 25.00">
+      <label>Note (optional)</label><input id="withdrawNote" placeholder="e.g. groceries / bills">
+      <button style="width:100%;margin-top:10px" onclick="recordWithdrawal()">Record withdrawal</button>
+    </div>
+    <div class="card">
+      <div class="muted small">PERSONAL WITHDRAWALS SUMMARY</div>
+      <div class="row"><span>Total withdrawn for personal use</span><b id="personalWithdrawnTotal">£0.00</b></div>
+      <div class="muted small">This is money removed from your betting bankroll for everyday spending, not betting losses.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">HISTORIC WITHDRAWALS</div>
+      <div class="row"><span>Total withdrawn</span><b id="withdrawalTotal">£0.00</b></div>
+      <div id="withdrawalRows"></div>
+    </div>
   </section>
-  <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only. Each-way bets use separate win/place terms and are settled as WIN, PLACE, LOSS or VOID.</div>
+  <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only. Bankroll includes the Bank account. Withdrawals reduce bankroll but are excluded from betting P/L. Each-way bets settle as WIN, PLACE, LOSS or VOID.</div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -188,18 +218,66 @@ function calcArb(){
  $('ls').textContent=money(lay);$('liab').textContent=money(liability);$('pw').textContent=money(win);$('pl').textContent=money(lose);$('roi').textContent=(roi*100).toFixed(2)+'%';
  $('arbTitle').textContent=g>0?'POSITIVE ARB':'No guaranteed arb';$('arbTitle').className='result '+(g>0?'good':'bad');
 }
+// v13 first-run reset: keep all app features, but start the tracker and ledgers clean.
+if(localStorage.getItem('keV13Initialized')!=='yes'){
+  ['keBets','keOpenBets','keAccounts','keBankCash','keWithdrawals','keBank'].forEach(k=>localStorage.removeItem(k));
+  localStorage.setItem('keV13Initialized','yes');
+}
 let bets=JSON.parse(localStorage.getItem('keBets')||'[]');
 let openBets=JSON.parse(localStorage.getItem('keOpenBets')||'[]');
-
 let accounts=JSON.parse(localStorage.getItem('keAccounts')||'null');
-if(!Array.isArray(accounts)){accounts=[{name:'Betfair',balance:70},{name:'Bet365',balance:14},{name:'Boylesports',balance:25},{name:'Livescore',balance:125},{name:"Dad's Sky",balance:184.82},{name:"Mum's Sky",balance:40.52},{name:"Dad's Betway",balance:33.92},{name:"Mum's Betway",balance:37.28}];localStorage.setItem('keAccounts',JSON.stringify(accounts));}
-let bankCash=Number(localStorage.getItem('keBankCash')); if(!Number.isFinite(bankCash)) bankCash=200.47;
+if(!Array.isArray(accounts)){
+ accounts=[
+  {name:'Betfair',balance:70},{name:'Bet365',balance:14},{name:'Boylesports',balance:25},
+  {name:'Livescore',balance:125},{name:"Dad's Sky",balance:184.82},{name:"Mum's Sky",balance:40.52},
+  {name:"Dad's Betway",balance:33.92},{name:"Mum's Betway",balance:37.28},{name:'Bank',balance:200.47}
+ ];
+ localStorage.setItem('keAccounts',JSON.stringify(accounts));
+}
+let withdrawals=JSON.parse(localStorage.getItem('keWithdrawals')||'[]');
 function accountTotal(){return accounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);}
-function refreshBankrollInputs(){const total=accountTotal();$('bank').value=total.toFixed(2);$('vb').value=total.toFixed(2);$('tb').value=total.toFixed(2);calcKelly();calcValue();}
-function renderAccounts(){const total=accountTotal();$('accountsTotal').textContent=money(total);$('accountRows').innerHTML=accounts.map(a=>`<div class="row"><span>${a.name}</span><b>${money(a.balance)}</b></div>`).join('');$('accountEdit').innerHTML=accounts.map((a,i)=>`<option value="${i}">${a.name}</option>`).join('');$('bankBalance').value=bankCash.toFixed(2);$('combinedTotal').textContent=money(total+bankCash);localStorage.setItem('keAccounts',JSON.stringify(accounts));refreshBankrollInputs();}
-function saveAccountBalance(){const i=+$('accountEdit').value,v=Number($('accountBalance').value);if(!Number.isInteger(i)||!Number.isFinite(v)||v<0){alert('Enter a valid non-negative balance.');return;}accounts[i].balance=Number(v.toFixed(2));renderAccounts();render();alert('Account balance updated.');}
-function saveBankBalance(){bankCash=Math.max(0,Number($('bankBalance').value)||0);localStorage.setItem('keBankCash',String(bankCash));$('combinedTotal').textContent=money(accountTotal()+bankCash);}
-function chooseAccount(){let choices=accounts.map((a,i)=>`${i+1}. ${a.name} (${money(a.balance)})`).join('\n');let answer=prompt('Which account was this bet placed with? Enter the number:\n'+choices+'\n\nCancel to leave it unsettled.');if(answer===null||answer.trim()==='')return null;let idx=Number(answer)-1;if(!Number.isInteger(idx)||idx<0||idx>=accounts.length){alert('Invalid account number. Bet left unsettled.');return null;}return idx;}
+function refreshBankrollInputs(){
+ const total=accountTotal();
+ $('bank').value=total.toFixed(2); $('vb').value=total.toFixed(2); $('tb').value=total.toFixed(2);
+ calcKelly();calcValue();
+}
+function renderAccounts(){
+ const total=accountTotal();
+ $('accountsTotal').textContent=money(total);
+ $('accountRows').innerHTML=accounts.map(a=>`<div class="row"><span>${a.name}</span><b>${money(a.balance)}</b></div>`).join('');
+ const opts=accounts.map((a,i)=>`<option value="${i}">${a.name}</option>`).join('');
+ $('accountEdit').innerHTML=opts; $('withdrawAccount').innerHTML=opts; $('betAccount').innerHTML=opts; $('betAccount').innerHTML=opts;
+ $('withdrawalTotal').textContent=money(withdrawals.reduce((s,w)=>s+w.amount,0));
+ $('personalWithdrawnTotal').textContent=money(withdrawals.reduce((s,w)=>s+w.amount,0));
+ $('withdrawalRows').innerHTML=withdrawals.length
+   ? withdrawals.slice().reverse().map(w=>`<div class="row"><span>${new Date(w.date).toLocaleDateString()}<br><span class="muted small">${w.account}${w.note?' • '+w.note:''}</span></span><b>−${money(w.amount)}</b></div>`).join('')
+   : '<div class="muted small">No withdrawals recorded yet.</div>';
+ localStorage.setItem('keAccounts',JSON.stringify(accounts));
+ localStorage.setItem('keWithdrawals',JSON.stringify(withdrawals));
+ refreshBankrollInputs();
+}
+function saveAccountBalance(){
+ const i=+$('accountEdit').value,v=Number($('accountBalance').value);
+ if(!Number.isInteger(i)||!Number.isFinite(v)||v<0){alert('Enter a valid non-negative balance.');return;}
+ accounts[i].balance=Number(v.toFixed(2));renderAccounts();render();alert('Account balance updated.');
+}
+function recordWithdrawal(){
+ const i=+$('withdrawAccount').value, amount=Number($('withdrawAmount').value), note=$('withdrawNote').value.trim();
+ if(!Number.isInteger(i)||!Number.isFinite(amount)||amount<=0){alert('Enter a valid withdrawal amount.');return;}
+ if(amount>Number(accounts[i].balance)){alert('The withdrawal cannot exceed the selected account balance.');return;}
+ accounts[i].balance=Number((accounts[i].balance-amount).toFixed(2));
+ withdrawals.push({account:accounts[i].name,amount:Number(amount.toFixed(2)),note,date:Date.now()});
+ $('withdrawAmount').value='';$('withdrawNote').value='';
+ renderAccounts();render();
+}
+function chooseAccount(){
+ let choices=accounts.map((a,i)=>`${i+1}. ${a.name} (${money(a.balance)})`).join('\\n');
+ let answer=prompt('Which account was this bet placed with? Enter the number:\\n'+choices+'\\n\\nCancel to leave it unsettled.');
+ if(answer===null||answer.trim()==='')return null;
+ let idx=Number(answer)-1;
+ if(!Number.isInteger(idx)||idx<0||idx>=accounts.length){alert('Invalid account number. Bet left unsettled.');return null;}
+ return idx;
+}
 
 // Older settled bets were saved before the tracker stored placement dates.
 // Treat those legacy bets as placed today so they appear in the date-based dashboard.
@@ -259,6 +337,7 @@ function render(){
 
   localStorage.setItem('keAccounts',JSON.stringify(accounts));
   localStorage.setItem('keBets',JSON.stringify(bets));
+  if($('accountsTotal')) renderAccounts();
   localStorage.setItem('keOpenBets',JSON.stringify(openBets));
 }
 
@@ -272,11 +351,16 @@ function addOpenBet(){
   let s=$('sel').value.trim(), st=+$('ts').value||0, o=+$('to').value||0, bt=$('bt').value, stakeType=$('stakeType').value;
   if(bt==='ew') st=+$('ews').value||0;
   if(!s||st<=0||o<=1)return;
-  const b={s,st,o,bt,stakeType,created:Date.now()};
+  const accountIndex=+$('betAccount').value;
+  if(!Number.isInteger(accountIndex)||!accounts[accountIndex]){alert('Please select the account used for this bet.');return;}
+  const exposure=stakeType==='free'?0:(bt==='ew'?st*2:(bt==='lay'?st*(o-1):st));
+  if(exposure>accounts[accountIndex].balance){alert('This account does not have enough available balance for that stake/liability.');return;}
+  const b={s,st,o,bt,stakeType,accountIndex,account:accounts[accountIndex].name,exposure,created:Date.now()};
   if(bt==='ew'){ b.ewf=+$('ewf').value; b.ewp=+$('ewp').value; }
+  accounts[accountIndex].balance=Number((accounts[accountIndex].balance-exposure).toFixed(2));
   openBets.push(b);
   $('sel').value='';$('ts').value='';$('to').value='';$('ews').value='';
-  render();
+  renderAccounts();render();
 }
 
 function calcBetPnl(b,r,odds){
@@ -324,20 +408,16 @@ function editSettledOdds(i){
 function settleOpen(i){
   const b=openBets[i];
   const promptText=b.bt==='ew'
-    ? 'Enter result: WIN, PLACE, LOSS or VOID\nWIN = both win & place paid\nPLACE = place part wins, win part loses'
+    ? 'Enter result: WIN, PLACE, LOSS or VOID\\nWIN = both win & place paid\\nPLACE = place part wins, win part loses'
     : 'Enter result: WIN, LOSS or VOID';
   let r=prompt(promptText);
   if(!r)return;
   r=r.trim().toLowerCase();
   const allowed=b.bt==='ew'?['win','place','loss','void']:['win','loss','void'];
   if(!allowed.includes(r))return;
-  const accountIndex=chooseAccount();
-  if(accountIndex===null)return;
-
-  let pnl=0, totalStake=b.st;
+  let pnl=0, totalStake=b.bt==='ew'?b.st*2:b.st;
   const free=b.stakeType==='free';
   if(b.bt==='ew'){
-    totalStake=b.st*2;
     const placeOdds=1+(b.o-1)*(b.ewf||0.2);
     if(r==='win') pnl=b.st*(b.o-1)+b.st*(placeOdds-1);
     else if(r==='place') pnl=(free?0:-b.st)+b.st*(placeOdds-1);
@@ -347,16 +427,21 @@ function settleOpen(i){
     pnl=r==='void'
       ? 0
       : (r==='win'
-        ? (b.bt==='back'?(free?b.st*(b.o-1):b.st*(b.o-1)):-b.st)
+        ? (b.bt==='back'?b.st*(b.o-1):-b.st)
         : (b.bt==='back'?(free?0:-b.st):b.st*(b.o-1)));
   }
-  accounts[accountIndex].balance=Number(((Number(accounts[accountIndex].balance)||0)+pnl).toFixed(2));
-  bets.push({s:b.s,st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:accounts[accountIndex].name});
+  const ai=Number.isInteger(b.accountIndex)?b.accountIndex:accounts.findIndex(a=>a.name===b.account);
+  if(ai>=0 && accounts[ai]){
+    // Return the reserved cash exposure plus net betting P/L; free bets reserve no cash.
+    const credit=(Number(b.exposure)||0)+pnl;
+    accounts[ai].balance=Number((accounts[ai].balance+credit).toFixed(2));
+  }
+  bets.push({s:b.s,st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:b.account|| (accounts[ai]&&accounts[ai].name)});
   openBets.splice(i,1);
-  render();
+  renderAccounts();render();
 }
 
-function saveTrack(){localStorage.setItem('keBank',$('tb').value)}
+function saveTrack(){/* bankroll is linked to account balances */}
 
 calcKelly();calcValue();calcArb();toggleEW();renderAccounts();render();
 </script>
