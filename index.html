@@ -12,7 +12,7 @@ h1{font-size:25px;margin:0}.sub{color:#8f98a5;font-size:12px;margin-top:3px}
 .card{background:#171c24;border:1px solid #252c37;border-radius:16px;padding:16px;margin:12px 0}
 label{display:block;font-size:12px;color:#aeb6c2;margin:10px 0 6px}
 input,select{width:100%;background:#0f1319;color:#fff;border:1px solid #343d49;border-radius:10px;padding:12px;font-size:16px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
 button{border:0;border-radius:10px;padding:11px;background:#252d39;color:#dfe5ec;font-weight:650}
 button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weight:800;margin:4px 0}.muted{color:#8f98a5}.good{color:#70e0a2}.warn{color:#f4c76b}.bad{color:#ff7d87}
 .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #252c37}.row:last-child{border-bottom:0}
@@ -28,6 +28,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <button id="tArb" onclick="tab('arb')">Back/Lay</button>
     <button id="tTracker" onclick="tab('tracker')">Tracker</button>
     <button id="tAccounts" onclick="tab('accounts')">Accounts</button>
+    <button id="tAntepost" onclick="tab('antepost')">Ante-post</button>
   </div>
 
   <section id="kelly" class="panel">
@@ -149,6 +150,30 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     </div>
   </section>
 
+  <section id="antepost" class="panel" style="display:none">
+    <div class="card">
+      <div class="muted small">LIVE ANTE-POST SUMMARY</div>
+      <div class="row"><span>Total live stakes</span><b id="antepostTotalStake">£0.00</b></div>
+      <div class="row"><span>Potential returns if all win</span><b id="antepostPotentialReturns">£0.00</b></div>
+      <div class="row"><span>Potential profit if all win</span><b id="antepostPotentialProfit">£0.00</b></div>
+      <div class="muted small" style="margin-top:8px">Standalone ante-post list only. These stakes and potential returns do not affect your accounts, bankroll, or betting P/L.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">ADD ANTE-POST BET</div>
+      <label>Selection / event</label><input id="apSelection" placeholder="e.g. Horse / team / tournament winner">
+      <div class="grid">
+        <div><label>Stake (£)</label><input id="apStake" type="number" min="0.01" step="0.01" placeholder="10.00"></div>
+        <div><label>Odds (decimal)</label><input id="apOdds" type="number" min="1.01" step="0.01" placeholder="e.g. 21.00"></div>
+      </div>
+      <label>Notes (optional)</label><input id="apNotes" placeholder="e.g. race, tournament, bookmaker">
+      <button style="width:100%;margin-top:10px" onclick="addAntepostBet()">Add ante-post bet</button>
+    </div>
+    <div class="card">
+      <div class="muted small">LIVE ANTE-POST BETS</div>
+      <div id="antepostBets"><div class="muted small">No ante-post bets added yet.</div></div>
+    </div>
+  </section>
+
   <section id="accounts" class="panel" style="display:none">
     <div class="card">
       <div class="muted small">OVERALL BANKROLL</div>
@@ -187,7 +212,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
 <script>
 const $=id=>document.getElementById(id);
 function money(x){return '£'+(Number(x)||0).toFixed(2)}
-function tab(x){['kelly','value','arb','tracker','accounts'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
+function tab(x){['kelly','value','arb','tracker','accounts','antepost'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts','tAntepost'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
 function calcKelly(){
  const B=+$('bank').value||0,O=+$('odds').value||0,P=(+$('prob').value||0)/100,F=+$('frac').value;
  if(O<=1){return}
@@ -234,7 +259,10 @@ if(!Array.isArray(accounts)){
  ];
  localStorage.setItem('keAccounts',JSON.stringify(accounts));
 }
+// Add a separate zero-balance shop-betting account without resetting existing balances.
+if(!accounts.some(a=>a.name==='Cash Account')){accounts.push({name:'Cash Account',balance:0});localStorage.setItem('keAccounts',JSON.stringify(accounts));}
 let withdrawals=JSON.parse(localStorage.getItem('keWithdrawals')||'[]');
+let antepostBets=JSON.parse(localStorage.getItem('keAntepostBets')||'[]');
 function accountTotal(){return accounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);}
 function refreshBankrollInputs(){
  const total=accountTotal();
@@ -290,6 +318,23 @@ if(legacyBetsUpdated) localStorage.setItem('keBets',JSON.stringify(bets));
 // Older settled bets were saved before timestamps were added. Treat them as legacy entries.
 // New bets use the time they were placed for period reporting.
 bets=bets.map(b=>({...b, date:b.date||null}));
+
+function saveAntepost(){localStorage.setItem('keAntepostBets',JSON.stringify(antepostBets));}
+function addAntepostBet(){
+ const selection=$('apSelection').value.trim(), stake=Number($('apStake').value), odds=Number($('apOdds').value), notes=$('apNotes').value.trim();
+ if(!selection||!Number.isFinite(stake)||stake<=0||!Number.isFinite(odds)||odds<=1){alert('Enter a selection, a stake greater than zero, and decimal odds above 1.00.');return;}
+ antepostBets.push({id:Date.now()+Math.random(),selection,stake:Number(stake.toFixed(2)),odds,notes,created:Date.now()});
+ $('apSelection').value='';$('apStake').value='';$('apOdds').value='';$('apNotes').value='';renderAntepost();
+}
+function deleteAntepostBet(id){if(!confirm('Delete this ante-post bet?'))return;antepostBets=antepostBets.filter(b=>String(b.id)!==String(id));renderAntepost();}
+function renderAntepost(){
+ const stakes=antepostBets.reduce((sum,b)=>sum+(Number(b.stake)||0),0);
+ const returns=antepostBets.reduce((sum,b)=>sum+(Number(b.stake)||0)*(Number(b.odds)||0),0);
+ $('antepostTotalStake').textContent=money(stakes);$('antepostPotentialReturns').textContent=money(returns);$('antepostPotentialProfit').textContent=money(returns-stakes);
+ $('antepostBets').innerHTML=antepostBets.length?antepostBets.slice().reverse().map(b=>`<div style="padding:10px 0;border-bottom:1px solid #252c37"><div class="row"><span><b>${escapeHtml(b.selection)}</b><br><span class="muted small">${b.odds.toFixed(2)} odds • Stake ${money(b.stake)}${b.notes?' • '+escapeHtml(b.notes):''}</span></span><b>${money(b.stake*b.odds)}</b></div><div class="row"><span class="muted small">Potential profit</span><span>${money(b.stake*(b.odds-1))}</span></div><button style="width:100%;margin-top:6px" onclick="deleteAntepostBet('${b.id}')">Delete bet</button></div>`).join(''):'<div class="muted small">No ante-post bets added yet.</div>';
+ saveAntepost();
+}
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 
 function render(){
   let p=bets.reduce((a,b)=>a+b.pnl,0);
@@ -443,7 +488,7 @@ function settleOpen(i){
 
 function saveTrack(){/* bankroll is linked to account balances */}
 
-calcKelly();calcValue();calcArb();toggleEW();renderAccounts();render();
+calcKelly();calcValue();calcArb();toggleEW();renderAccounts();render();renderAntepost();
 </script>
 </body>
 </html>
