@@ -377,13 +377,16 @@ function render(){
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map((b,i)=>{
         const idx=bets.length-1-i;
-        const sportOptions=$('betSport').innerHTML.replace(/<option value=""[^>]*>[^<]*<\/option>/,'');
-        return `<div class="row"><span>${escapeHtml(b.s)} <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${b.o} • £${Number(b.st||0).toFixed(2)}${b.result?' • '+escapeHtml(b.result.toUpperCase()):''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
-        <label style="display:block;margin:6px 0 4px">Sport for this settled bet</label><select style="width:100%;margin-bottom:6px" onchange="setSettledSport(${idx},this.value)"><option value="">Unassigned / no sport</option>${sportOptions.replace(/<option value="">Select sport \(optional\)<\/option>/,'').replace(new RegExp('value="'+String(b.sport||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"'), 'value="'+String(b.sport||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" selected')}</select>
-        <button style="width:100%;margin:0 0 10px" onclick="editSettledReturn(${idx})">Edit actual return / P&amp;L</button>`;
+        const sportOptions=Array.from(document.querySelectorAll('#betSport option')).filter(o=>o.value!=='').map(o=>`<option value="${escapeHtml(o.value)}" ${b.sport===o.value?'selected':''}>${escapeHtml(o.textContent)}</option>`).join('');
+        return `<div style="padding:8px 0;border-bottom:1px solid #252c37"><div class="row"><span>${escapeHtml(b.s)} <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${b.o} • £${Number(b.st||0).toFixed(2)}${b.result?' • '+escapeHtml(b.result.toUpperCase()):''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
+        <button style="width:100%;margin:8px 0" onclick="toggleSettledEditor(${idx})">Edit</button>
+        <div id="settledEditor${idx}" style="display:none;padding:10px;background:#10141b;border-radius:10px;margin-bottom:10px">
+          <label>Sport</label><select id="settledSport${idx}"><option value="">Unassigned / no sport</option>${sportOptions}</select>
+          <label style="display:block;margin-top:8px">Actual net profit / loss (£)</label><input id="settledPnl${idx}" type="number" step="0.01" value="${Number(b.pnl||0).toFixed(2)}">
+          <div class="grid" style="margin-top:8px"><button onclick="saveSettledEditor(${idx})">Save changes</button><button onclick="toggleSettledEditor(${idx},false)">Cancel</button></div>
+        </div></div>`;
       }).join('')
     : '<div class="muted small">No settled bets yet.</div>';
-
   $('openBets').innerHTML=openBets.length
     ? openBets.slice().reverse().map((b,i)=>{
         const idx=openBets.length-1-i;
@@ -456,6 +459,49 @@ function editOpenOdds(i){
   if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
   b.o=o;
   render();
+}
+
+function toggleSettledEditor(i, forceOpen){
+ const el=$('settledEditor'+i); if(!el)return;
+ el.style.display=forceOpen===false?'none':(el.style.display==='none'?'block':'none');
+}
+function saveSettledEditor(i){
+ const b=bets[i]; if(!b)return;
+ const sport=$('settledSport'+i).value;
+ const corrected=Number($('settledPnl'+i).value);
+ if(!Number.isFinite(corrected)){alert('Enter a valid net profit/loss amount.');return;}
+ const delta=Number((corrected-(Number(b.pnl)||0)).toFixed(2));
+ b.sport=sport;
+ if(b.account){const account=accounts.find(a=>a.name===b.account);if(account)account.balance=Number(((Number(account.balance)||0)+delta).toFixed(2));}
+ b.pnl=Number(corrected.toFixed(2)); b.manualPnl=true;
+ localStorage.setItem('keBets',JSON.stringify(bets));localStorage.setItem('keAccounts',JSON.stringify(accounts));
+ renderAccounts();render();
+}
+function editSettledBet(i){
+  const b=bets[i];
+  if(!b)return;
+  const options=Array.from(document.querySelectorAll('#betSport option'))
+    .map(o=>({value:o.value,label:o.textContent.trim()}))
+    .filter(o=>o.label && o.label!=='Select sport (optional)');
+  const currentSport=String(b.sport||'');
+  const choices=['0. Unassigned / no sport',...options.filter(o=>o.value!=='').map((o,n)=>`${n+1}. ${o.label}`)].join('\n');
+  const sportAnswer=prompt('EDIT SETTLED BET — SPORT\nEnter the number for the sport (0 = unassigned):\n\n'+choices+'\n\nCurrent: '+(currentSport||'Unassigned / no sport'), currentSport ? String(Math.max(1,options.filter(o=>o.value!=='').findIndex(o=>o.value===currentSport)+1)) : '0');
+  if(sportAnswer===null)return;
+  const sportN=Number(sportAnswer);
+  if(!Number.isInteger(sportN)||sportN<0||sportN>options.filter(o=>o.value!=='').length){alert('Invalid sport number.');return;}
+  const sports=options.filter(o=>o.value!=='');
+  b.sport=sportN===0?'':sports[sportN-1].value;
+  const current=Number(b.pnl)||0;
+  const val=prompt('EDIT SETTLED BET — ACTUAL NET PROFIT / LOSS (£)\nEnter the correct net profit or loss, not the odds. Use a minus for a loss. Example: 12.50 or -10.00.',current.toFixed(2));
+  if(val===null){localStorage.setItem('keBets',JSON.stringify(bets));render();return;}
+  const corrected=Number(val);
+  if(!Number.isFinite(corrected)){alert('Enter a valid amount, e.g. 12.50 or -10.00.');return;}
+  const delta=Number((corrected-current).toFixed(2));
+  if(b.account){const account=accounts.find(a=>a.name===b.account);if(account)account.balance=Number(((Number(account.balance)||0)+delta).toFixed(2));}
+  b.pnl=Number(corrected.toFixed(2)); b.manualPnl=true;
+  localStorage.setItem('keBets',JSON.stringify(bets));
+  localStorage.setItem('keAccounts',JSON.stringify(accounts));
+  renderAccounts();render();
 }
 
 function setSettledSport(index, sport){
