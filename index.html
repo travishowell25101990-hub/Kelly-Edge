@@ -118,8 +118,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <div class="card">
       <div class="muted small">NEW BET</div>
       <label>Selection / event</label><input id="sel" placeholder="e.g. Suva FC">
-    <label>Account placed with</label><select id="betAccount"></select>
-    <label>Account placed with</label><select id="betAccount"></select>
+      <label>Account placed with</label><select id="betAccount"></select>
       <div class="grid">
         <div><label>Stake (£)</label><input id="ts" type="number" placeholder="25" step="0.01"></div>
         <div><label>Entry odds</label><input id="to" type="number" placeholder="1.72" step="0.01"></div>
@@ -274,7 +273,7 @@ function renderAccounts(){
  $('accountsTotal').textContent=money(total);
  $('accountRows').innerHTML=accounts.map(a=>`<div class="row"><span>${a.name}</span><b>${money(a.balance)}</b></div>`).join('');
  const opts=accounts.map((a,i)=>`<option value="${i}">${a.name}</option>`).join('');
- $('accountEdit').innerHTML=opts; $('withdrawAccount').innerHTML=opts; $('betAccount').innerHTML=opts; $('betAccount').innerHTML=opts;
+ $('accountEdit').innerHTML=opts; $('withdrawAccount').innerHTML=opts; $('betAccount').innerHTML=opts;
  $('withdrawalTotal').textContent=money(withdrawals.reduce((s,w)=>s+w.amount,0));
  $('personalWithdrawnTotal').textContent=money(withdrawals.reduce((s,w)=>s+w.amount,0));
  $('withdrawalRows').innerHTML=withdrawals.length
@@ -448,6 +447,24 @@ function editSettledOdds(i){
   b.o=o;
   b.pnl=calcBetPnl(b,b.result,o);
   render();
+}
+
+function editSettledReturn(i){
+  const b=bets[i];
+  const current=Number(b.pnl)||0;
+  const val=prompt('Enter the correct NET profit/loss for this settled bet in £ (use a minus for a loss). This overrides the calculated figure.',current.toFixed(2));
+  if(val===null)return;
+  const corrected=Number(val);
+  if(!Number.isFinite(corrected)){alert('Enter a valid amount, e.g. 12.50 or -10.00.');return;}
+  const delta=Number((corrected-current).toFixed(2));
+  // Keep the linked account balance consistent with the corrected settled P/L.
+  if(b.account){
+    const account=accounts.find(a=>a.name===b.account);
+    if(account) account.balance=Number(((Number(account.balance)||0)+delta).toFixed(2));
+  }
+  b.pnl=Number(corrected.toFixed(2));
+  b.manualPnl=true;
+  renderAccounts();render();
 }
 
 function settleOpen(i){
