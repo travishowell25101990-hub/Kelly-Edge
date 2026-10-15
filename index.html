@@ -377,7 +377,9 @@ function render(){
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map((b,i)=>{
         const idx=bets.length-1-i;
-        return `<div class="row"><span>${b.s} <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${b.o} • £${b.st.toFixed(2)}${b.result?' • '+b.result.toUpperCase():''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
+        const sportOptions=$('betSport').innerHTML.replace(/<option value=""[^>]*>[^<]*<\/option>/,'');
+        return `<div class="row"><span>${escapeHtml(b.s)} <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${b.o} • £${Number(b.st||0).toFixed(2)}${b.result?' • '+escapeHtml(b.result.toUpperCase()):''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
+        <label style="display:block;margin:6px 0 4px">Sport for this settled bet</label><select style="width:100%;margin-bottom:6px" onchange="setSettledSport(${idx},this.value)"><option value="">Unassigned / no sport</option>${sportOptions.replace(/<option value="">Select sport \(optional\)<\/option>/,'').replace(new RegExp('value="'+String(b.sport||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"'), 'value="'+String(b.sport||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" selected')}</select>
         <button style="width:100%;margin:0 0 10px" onclick="editSettledReturn(${idx})">Edit actual return / P&amp;L</button>`;
       }).join('')
     : '<div class="muted small">No settled bets yet.</div>';
@@ -454,6 +456,13 @@ function editOpenOdds(i){
   if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
   b.o=o;
   render();
+}
+
+function setSettledSport(index, sport){
+ if(!Number.isInteger(index)||index<0||index>=bets.length)return;
+ bets[index].sport=String(sport||'').trim();
+ localStorage.setItem('keBets',JSON.stringify(bets));
+ render();
 }
 
 function editSettledReturn(i){
