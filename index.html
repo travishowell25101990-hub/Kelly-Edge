@@ -118,6 +118,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <div class="card">
       <div class="muted small">NEW BET</div>
       <label>Selection / event</label><input id="sel" placeholder="e.g. Suva FC">
+      <label>Sport</label><select id="betSport"><option value="">Select sport (optional)</option><option value="Football (Soccer)">Football (Soccer)</option><option value="American Football (NFL)">American Football (NFL)</option><option value="Canadian Football">Canadian Football</option><option value="Australian Rules Football">Australian Rules Football</option><option value="Rugby Union">Rugby Union</option><option value="Rugby League">Rugby League</option><option value="Cricket">Cricket</option><option value="Tennis">Tennis</option><option value="Table Tennis">Table Tennis</option><option value="Badminton">Badminton</option><option value="Squash">Squash</option><option value="Basketball">Basketball</option><option value="Baseball (MLB)">Baseball (MLB)</option><option value="Baseball (KBO/NPB)">Baseball (KBO/NPB)</option><option value="Ice Hockey">Ice Hockey</option><option value="Field Hockey">Field Hockey</option><option value="Volleyball">Volleyball</option><option value="Beach Volleyball">Beach Volleyball</option><option value="Handball">Handball</option><option value="Netball">Netball</option><option value="Water Polo">Water Polo</option><option value="Golf">Golf</option><option value="Horse Racing">Horse Racing</option><option value="Greyhound Racing">Greyhound Racing</option><option value="Cycling - Road">Cycling - Road</option><option value="Cycling - Track">Cycling - Track</option><option value="Cycling - BMX">Cycling - BMX</option><option value="Cycling - Mountain Bike">Cycling - Mountain Bike</option><option value="Formula 1">Formula 1</option><option value="MotoGP">MotoGP</option><option value="NASCAR">NASCAR</option><option value="Rally">Rally</option><option value="Darts">Darts</option><option value="Snooker">Snooker</option><option value="Pool">Pool</option><option value="Billiards">Billiards</option><option value="Boxing">Boxing</option><option value="MMA / UFC">MMA / UFC</option><option value="Wrestling">Wrestling</option><option value="Athletics / Track & Field">Athletics / Track & Field</option><option value="Marathon / Road Running">Marathon / Road Running</option><option value="Swimming">Swimming</option><option value="Diving">Diving</option><option value="Rowing">Rowing</option><option value="Canoeing / Kayaking">Canoeing / Kayaking</option><option value="Sailing">Sailing</option><option value="Surfing">Surfing</option><option value="Skateboarding">Skateboarding</option><option value="Snowboarding">Snowboarding</option><option value="Alpine Skiing">Alpine Skiing</option><option value="Cross-country Skiing">Cross-country Skiing</option><option value="Biathlon">Biathlon</option><option value="Ski Jumping">Ski Jumping</option><option value="Figure Skating">Figure Skating</option><option value="Speed Skating">Speed Skating</option><option value="Curling">Curling</option><option value="Gymnastics">Gymnastics</option><option value="Weightlifting">Weightlifting</option><option value="Powerlifting">Powerlifting</option><option value="Wrestling (Olympic)">Wrestling (Olympic)</option><option value="Fencing">Fencing</option><option value="Judo">Judo</option><option value="Taekwondo">Taekwondo</option><option value="Karate">Karate</option><option value="Wushu">Wushu</option><option value="Archery">Archery</option><option value="Shooting">Shooting</option><option value="Equestrian">Equestrian</option><option value="Dressage">Dressage</option><option value="Show Jumping">Show Jumping</option><option value="Eventing">Eventing</option><option value="Triathlon">Triathlon</option><option value="Ironman">Ironman</option><option value="Lacrosse">Lacrosse</option><option value="American College Football (NCAAF)">American College Football (NCAAF)</option><option value="College Basketball (NCAAB)">College Basketball (NCAAB)</option><option value="Esports - Counter-Strike">Esports - Counter-Strike</option><option value="Esports - Dota 2">Esports - Dota 2</option><option value="Esports - League of Legends">Esports - League of Legends</option><option value="Esports - Valorant">Esports - Valorant</option><option value="Esports - Overwatch">Esports - Overwatch</option><option value="Esports - StarCraft">Esports - StarCraft</option><option value="Esports - Call of Duty">Esports - Call of Duty</option><option value="Esports - Rocket League">Esports - Rocket League</option><option value="Esports - FIFA / EA Sports FC">Esports - FIFA / EA Sports FC</option><option value="Esports - Other">Esports - Other</option><option value="Politics">Politics</option><option value="Entertainment / Specials">Entertainment / Specials</option><option value="Other">Other</option></select>
       <label>Account placed with</label><select id="betAccount"></select>
       <div class="grid">
         <div><label>Stake (£)</label><input id="ts" type="number" placeholder="25" step="0.01"></div>
@@ -358,8 +359,8 @@ function render(){
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map((b,i)=>{
         const idx=bets.length-1-i;
-        return `<div class="row"><span>${b.s} <span class="muted small">${b.o} • £${b.st.toFixed(2)}${b.result?' • '+b.result.toUpperCase():''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
-        <button style="width:100%;margin:0 0 10px" onclick="editSettledOdds(${idx})">Edit odds</button>`;
+        return `<div class="row"><span>${b.s} <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${b.o} • £${b.st.toFixed(2)}${b.result?' • '+b.result.toUpperCase():''}${b.stakeType==='free'?' • FREE BET':''}</span></span><b class="${b.pnl>=0?'good':'bad'}">${money(b.pnl)}</b></div>
+        <button style="width:100%;margin:0 0 10px" onclick="editSettledReturn(${idx})">Edit actual return / P&amp;L</button>`;
       }).join('')
     : '<div class="muted small">No settled bets yet.</div>';
 
@@ -369,7 +370,7 @@ function render(){
         const typeLabel=(b.bt==='ew'?`EACH WAY • ${b.o.toFixed(2)} • ${b.ewf===0.2?'1/5':b.ewf===0.25?'1/4':b.ewf===0.3333333333?'1/3':b.ewf===0.5?'1/2':(b.ewf||0.2)} • ${b.ewp||4}pl`:`${b.bt.toUpperCase()} • ${b.o.toFixed(2)}`)+(b.stakeType==='free'?' • FREE BET':'');
         const displayStake=b.bt==='ew'?b.st*2:b.st;
         return `<div class="row">
-          <span><b>${b.s}</b> <span class="muted small">${typeLabel}</span></span>
+          <span><b>${b.s}</b> <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${typeLabel}</span></span>
           <b>${money(displayStake)}</b>
         </div>
         <div class="grid" style="margin-top:6px">
@@ -399,11 +400,11 @@ function addOpenBet(){
   if(!Number.isInteger(accountIndex)||!accounts[accountIndex]){alert('Please select the account used for this bet.');return;}
   const exposure=stakeType==='free'?0:(bt==='ew'?st*2:(bt==='lay'?st*(o-1):st));
   if(exposure>accounts[accountIndex].balance){alert('This account does not have enough available balance for that stake/liability.');return;}
-  const b={s,st,o,bt,stakeType,accountIndex,account:accounts[accountIndex].name,exposure,created:Date.now()};
+  const b={s,sport:$('betSport').value,st,o,bt,stakeType,accountIndex,account:accounts[accountIndex].name,exposure,created:Date.now()};
   if(bt==='ew'){ b.ewf=+$('ewf').value; b.ewp=+$('ewp').value; }
   accounts[accountIndex].balance=Number((accounts[accountIndex].balance-exposure).toFixed(2));
   openBets.push(b);
-  $('sel').value='';$('ts').value='';$('to').value='';$('ews').value='';
+  $('sel').value='';$('betSport').value='';$('ts').value='';$('to').value='';$('ews').value='';
   renderAccounts();render();
 }
 
@@ -437,22 +438,10 @@ function editOpenOdds(i){
   render();
 }
 
-function editSettledOdds(i){
-  const b=bets[i];
-  if(!b.result){alert('This older bet has no stored result, so its P/L cannot be recalculated safely.');return;}
-  const val=prompt('Enter the correct/final odds:',b.o);
-  if(val===null)return;
-  const o=Number(val);
-  if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
-  b.o=o;
-  b.pnl=calcBetPnl(b,b.result,o);
-  render();
-}
-
 function editSettledReturn(i){
   const b=bets[i];
   const current=Number(b.pnl)||0;
-  const val=prompt('Enter the correct NET profit/loss for this settled bet in £ (use a minus for a loss). This overrides the calculated figure.',current.toFixed(2));
+  const val=prompt('Enter the ACTUAL NET profit/loss for this settled bet in £ — do not enter odds. Use a minus for a loss (e.g. 12.50 profit = 12.50; £10 loss = -10.00). This overrides the calculated figure.',current.toFixed(2));
   if(val===null)return;
   const corrected=Number(val);
   if(!Number.isFinite(corrected)){alert('Enter a valid amount, e.g. 12.50 or -10.00.');return;}
