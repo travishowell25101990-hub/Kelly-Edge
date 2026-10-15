@@ -29,6 +29,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <button id="tTracker" onclick="tab('tracker')">Tracker</button>
     <button id="tAccounts" onclick="tab('accounts')">Accounts</button>
     <button id="tAntepost" onclick="tab('antepost')">Ante-post</button>
+    <button id="tSports" onclick="tab('sports')">Sports P/L</button>
   </div>
 
   <section id="kelly" class="panel">
@@ -150,6 +151,16 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     </div>
   </section>
 
+  <section id="sports" class="panel" style="display:none">
+    <div class="card">
+      <div class="muted small">PROFIT / LOSS BY SPORT</div>
+      <div class="muted small" style="margin:8px 0 12px">Settled bets are grouped by the sport selected when each bet was placed. Open bets and standalone ante-post bets are not included.</div>
+      <div class="row"><span>Total settled P/L</span><b id="sportsTotalPnl">£0.00</b></div>
+      <div class="row"><span>Total settled stakes</span><b id="sportsTotalStaked">£0.00</b></div>
+      <div id="sportsPLRows" style="margin-top:12px"></div>
+    </div>
+  </section>
+
   <section id="antepost" class="panel" style="display:none">
     <div class="card">
       <div class="muted small">LIVE ANTE-POST SUMMARY</div>
@@ -212,7 +223,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
 <script>
 const $=id=>document.getElementById(id);
 function money(x){return '£'+(Number(x)||0).toFixed(2)}
-function tab(x){['kelly','value','arb','tracker','accounts','antepost'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts','tAntepost'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
+function tab(x){['kelly','value','arb','tracker','accounts','antepost','sports'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts','tAntepost','tSports'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
 function calcKelly(){
  const B=+$('bank').value||0,O=+$('odds').value||0,P=(+$('prob').value||0)/100,F=+$('frac').value;
  if(O<=1){return}
@@ -355,6 +366,13 @@ function render(){
   $('stakedAll').textContent=money(staked);
   $('roiAll').textContent=(staked?(p/staked*100):0).toFixed(2)+'%';
   $('plToday').title='Uses bet placement time. Legacy bets from before date tracking was added are treated as placed today.';
+
+  const sportStats={};
+  bets.forEach(b=>{const sport=(b.sport&&String(b.sport).trim())?String(b.sport).trim():'Unassigned / no sport';if(!sportStats[sport])sportStats[sport]={pnl:0,staked:0,count:0};sportStats[sport].pnl+=Number(b.pnl)||0;sportStats[sport].staked+=(b.stakeType==='free'?0:Number(b.st)||0);sportStats[sport].count++;});
+  const sportEntries=Object.entries(sportStats).sort((a,b)=>b[1].pnl-a[1].pnl);
+  $('sportsTotalPnl').textContent=money(p);$('sportsTotalPnl').className=p>=0?'good':'bad';
+  $('sportsTotalStaked').textContent=money(staked);
+  $('sportsPLRows').innerHTML=sportEntries.length?sportEntries.map(([sport,v])=>`<div style="padding:10px 0;border-bottom:1px solid #252c37"><div class="row"><b>${escapeHtml(sport)}</b><b class="${v.pnl>=0?'good':'bad'}">${money(v.pnl)}</b></div><div class="row muted small"><span>${v.count} settled bet${v.count===1?'':'s'} • Staked ${money(v.staked)}</span><span>ROI ${v.staked?(v.pnl/v.staked*100).toFixed(2):'0.00'}%</span></div></div>`).join(''):'<div class="muted small">No settled bets to report yet. Select a sport when placing bets to see its P/L here.</div>';
 
   $('bets').innerHTML=bets.length
     ? bets.slice().reverse().map((b,i)=>{
