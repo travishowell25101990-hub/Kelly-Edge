@@ -272,6 +272,8 @@ if(!Array.isArray(accounts)){
 }
 // Add a separate zero-balance shop-betting account without resetting existing balances.
 if(!accounts.some(a=>a.name==='Cash Account')){accounts.push({name:'Cash Account',balance:0});localStorage.setItem('keAccounts',JSON.stringify(accounts));}
+// Add Dad's Paddy Power without resetting any existing account balances.
+if(!accounts.some(a=>a.name==="Dad's Paddy Power")){accounts.push({name:"Dad's Paddy Power",balance:0});localStorage.setItem('keAccounts',JSON.stringify(accounts));}
 let withdrawals=JSON.parse(localStorage.getItem('keWithdrawals')||'[]');
 let antepostBets=JSON.parse(localStorage.getItem('keAntepostBets')||'[]');
 function accountTotal(){return accounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);}
