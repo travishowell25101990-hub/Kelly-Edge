@@ -560,7 +560,7 @@ function settleOpen(i){
     const credit=(Number(b.exposure)||0)+pnl;
     accounts[ai].balance=Number((accounts[ai].balance+credit).toFixed(2));
   }
-  bets.push({s:b.s,st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:b.account|| (accounts[ai]&&accounts[ai].name)});
+  bets.push({s:b.s,sport:b.sport||'',st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:b.account|| (accounts[ai]&&accounts[ai].name)});
   openBets.splice(i,1);
   renderAccounts();render();
 }
