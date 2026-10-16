@@ -395,13 +395,16 @@ function render(){
         const idx=openBets.length-1-i;
         const typeLabel=(b.bt==='ew'?`EACH WAY • ${b.o.toFixed(2)} • ${b.ewf===0.2?'1/5':b.ewf===0.25?'1/4':b.ewf===0.3333333333?'1/3':b.ewf===0.5?'1/2':(b.ewf||0.2)} • ${b.ewp||4}pl`:`${b.bt.toUpperCase()} • ${b.o.toFixed(2)}`)+(b.stakeType==='free'?' • FREE BET':'');
         const displayStake=b.bt==='ew'?b.st*2:b.st;
-        return `<div class="row">
-          <span><b>${b.s}</b> <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${typeLabel}</span></span>
-          <b>${money(displayStake)}</b>
-        </div>
-        <div class="grid" style="margin-top:6px">
-          <button onclick="editOpenOdds(${idx})">Edit odds</button>
-          <button onclick="settleOpen(${idx})">Settle bet</button>
+        const sportOptions=Array.from(document.querySelectorAll('#betSport option')).filter(o=>o.value!=='').map(o=>`<option value="${escapeHtml(o.value)}" ${b.sport===o.value?'selected':''}>${escapeHtml(o.textContent)}</option>`).join('');
+        return `<div style="padding:8px 0;border-bottom:1px solid #252c37">
+          <div class="row"><span><b>${escapeHtml(b.s)}</b> <span class="muted small">${b.sport?escapeHtml(b.sport)+' • ':''}${typeLabel}</span></span><b>${money(displayStake)}</b></div>
+          <div class="grid" style="margin-top:6px"><button onclick="toggleOpenEditor(${idx})">Edit</button><button onclick="settleOpen(${idx})">Settle bet</button></div>
+          <div id="openEditor${idx}" style="display:none;padding:10px;background:#10141b;border-radius:10px;margin-top:8px">
+            <label>Sport</label><select id="openSport${idx}"><option value="">Unassigned / no sport</option>${sportOptions}</select>
+            <label style="display:block;margin-top:8px">Account used</label><select id="openAccount${idx}">${accounts.map((a,ai)=>`<option value="${ai}" ${(b.account===a.name || b.accountIndex===ai)?'selected':''}>${escapeHtml(a.name)}</option>`).join('')}</select>
+            <label style="display:block;margin-top:8px">Odds</label><input id="openOdds${idx}" type="number" min="1.01" step="0.01" value="${Number(b.o).toFixed(2)}">
+            <div class="grid" style="margin-top:8px"><button onclick="saveOpenEditor(${idx})">Save changes</button><button onclick="toggleOpenEditor(${idx},false)">Cancel</button></div>
+          </div>
         </div>`;
       }).join('')
     : '<div class="muted small">No live bets. Add a bet above to track it in-play.</div>';
@@ -454,14 +457,36 @@ function calcBetPnl(b,r,odds){
   return pnl;
 }
 
-function editOpenOdds(i){
-  const b=openBets[i];
-  const val=prompt('Enter the correct/final odds:',b.o);
-  if(val===null)return;
-  const o=Number(val);
-  if(!Number.isFinite(o)||o<=1){alert('Please enter valid odds above 1.00.');return;}
-  b.o=o;
-  render();
+function toggleOpenEditor(i, forceOpen){
+ const el=$('openEditor'+i); if(!el)return;
+ el.style.display=forceOpen===false?'none':(el.style.display==='none'?'block':'none');
+}
+function saveOpenEditor(i){
+ const b=openBets[i]; if(!b)return;
+ const sport=$('openSport'+i).value;
+ const selectedIndex=Number($('openAccount'+i).value);
+ const odds=Number($('openOdds'+i).value);
+ if(!Number.isInteger(selectedIndex)||!accounts[selectedIndex]){alert('Please select a valid account.');return;}
+ if(!Number.isFinite(odds)||odds<=1){alert('Please enter valid odds above 1.00.');return;}
+ const oldIndex=Number.isInteger(b.accountIndex)?b.accountIndex:accounts.findIndex(a=>a.name===b.account);
+ const oldAccount=oldIndex>=0?accounts[oldIndex]:null;
+ const newAccount=accounts[selectedIndex];
+ const oldExposure=Number(b.exposure)||0;
+ const newExposure=b.stakeType==='free'?0:(b.bt==='ew'?b.st*2:(b.bt==='lay'?b.st*(odds-1):b.st));
+ if(oldAccount===newAccount){
+   const adjusted=Number(((Number(newAccount.balance)||0)+oldExposure-newExposure).toFixed(2));
+   if(adjusted< -0.001){alert('This account does not have enough available balance for the updated liability.');return;}
+   newAccount.balance=adjusted;
+ } else {
+   const adjusted=Number(((Number(newAccount.balance)||0)-newExposure).toFixed(2));
+   if(adjusted< -0.001){alert('The selected account does not have enough available balance for this stake/liability.');return;}
+   if(oldAccount)oldAccount.balance=Number(((Number(oldAccount.balance)||0)+oldExposure).toFixed(2));
+   newAccount.balance=adjusted;
+ }
+ b.sport=sport; b.account=newAccount.name; b.accountIndex=selectedIndex; b.o=odds; b.exposure=Number(newExposure.toFixed(2));
+ localStorage.setItem('keOpenBets',JSON.stringify(openBets));
+ localStorage.setItem('keAccounts',JSON.stringify(accounts));
+ renderAccounts();render();
 }
 
 function toggleSettledEditor(i, forceOpen){
