@@ -402,6 +402,7 @@ function render(){
           <div id="openEditor${idx}" style="display:none;padding:10px;background:#10141b;border-radius:10px;margin-top:8px">
             <label>Sport</label><select id="openSport${idx}"><option value="">Unassigned / no sport</option>${sportOptions}</select>
             <label style="display:block;margin-top:8px">Account used</label><select id="openAccount${idx}">${accounts.map((a,ai)=>`<option value="${ai}" ${(b.account===a.name || b.accountIndex===ai)?'selected':''}>${escapeHtml(a.name)}</option>`).join('')}</select>
+            <label style="display:block;margin-top:8px">${b.bt==='ew'?'Stake each way (£)':'Stake (£)'}</label><input id="openStake${idx}" type="number" min="0.01" step="0.01" value="${Number(b.st).toFixed(2)}">
             <label style="display:block;margin-top:8px">Odds</label><input id="openOdds${idx}" type="number" min="1.01" step="0.01" value="${Number(b.o).toFixed(2)}">
             <div class="grid" style="margin-top:8px"><button onclick="saveOpenEditor(${idx})">Save changes</button><button onclick="toggleOpenEditor(${idx},false)">Cancel</button></div>
           </div>
@@ -466,13 +467,15 @@ function saveOpenEditor(i){
  const sport=$('openSport'+i).value;
  const selectedIndex=Number($('openAccount'+i).value);
  const odds=Number($('openOdds'+i).value);
+ const stake=Number($('openStake'+i).value);
  if(!Number.isInteger(selectedIndex)||!accounts[selectedIndex]){alert('Please select a valid account.');return;}
  if(!Number.isFinite(odds)||odds<=1){alert('Please enter valid odds above 1.00.');return;}
+ if(!Number.isFinite(stake)||stake<=0){alert('Please enter a stake greater than £0.');return;}
  const oldIndex=Number.isInteger(b.accountIndex)?b.accountIndex:accounts.findIndex(a=>a.name===b.account);
  const oldAccount=oldIndex>=0?accounts[oldIndex]:null;
  const newAccount=accounts[selectedIndex];
  const oldExposure=Number(b.exposure)||0;
- const newExposure=b.stakeType==='free'?0:(b.bt==='ew'?b.st*2:(b.bt==='lay'?b.st*(odds-1):b.st));
+ const newExposure=b.stakeType==='free'?0:(b.bt==='ew'?stake*2:(b.bt==='lay'?stake*(odds-1):stake));
  if(oldAccount===newAccount){
    const adjusted=Number(((Number(newAccount.balance)||0)+oldExposure-newExposure).toFixed(2));
    if(adjusted< -0.001){alert('This account does not have enough available balance for the updated liability.');return;}
@@ -483,7 +486,7 @@ function saveOpenEditor(i){
    if(oldAccount)oldAccount.balance=Number(((Number(oldAccount.balance)||0)+oldExposure).toFixed(2));
    newAccount.balance=adjusted;
  }
- b.sport=sport; b.account=newAccount.name; b.accountIndex=selectedIndex; b.o=odds; b.exposure=Number(newExposure.toFixed(2));
+ b.sport=sport; b.account=newAccount.name; b.accountIndex=selectedIndex; b.st=stake; b.o=odds; b.exposure=Number(newExposure.toFixed(2));
  localStorage.setItem('keOpenBets',JSON.stringify(openBets));
  localStorage.setItem('keAccounts',JSON.stringify(accounts));
  renderAccounts();render();
