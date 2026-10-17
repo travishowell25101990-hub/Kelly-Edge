@@ -108,7 +108,7 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
 
     <div class="card">
       <div class="muted small">P/L DASHBOARD</div>
-      <div class="row"><span>Today</span><b id="plToday">£0.00</b></div>
+      <div class="row"><span>Last 24 hours</span><b id="plToday">£0.00</b></div>
       <div class="row"><span>Last 7 days</span><b id="pl7">£0.00</b></div>
       <div class="row"><span>Last 30 days</span><b id="pl30">£0.00</b></div>
       <div class="row"><span>Total P/L</span><b id="plAll">£0.00</b></div>
@@ -358,16 +358,18 @@ function render(){
   $('openCount').textContent=openBets.length;
 
   const now=Date.now(), day=86400000;
-  const validBets=bets.filter(b=>b.date);
-  const periodPnl=(days)=>validBets.filter(b=>now-b.date<days*day && now-b.date>=0).reduce((a,b)=>a+b.pnl,0);
+  // Period P/L is based on settlement time, not when the bet was placed.
+  // Last 24 hours is rolling; 7/30 days use rolling periods.
+  const settledTime=(b)=>Number(b.settledAt)||Number(b.date)||0;
+  const periodPnl=(hours)=>bets.filter(b=>settledTime(b)>=now-hours*60*60*1000 && settledTime(b)<=now).reduce((a,b)=>a+(Number(b.pnl)||0),0);
   const staked=bets.reduce((a,b)=>a+(b.stakeType==='free'?0:b.st),0);
-  $('plToday').textContent=money(periodPnl(1));
-  $('pl7').textContent=money(periodPnl(7));
-  $('pl30').textContent=money(periodPnl(30));
+  $('plToday').textContent=money(periodPnl(24));
+  $('pl7').textContent=money(periodPnl(24*7));
+  $('pl30').textContent=money(periodPnl(24*30));
   $('plAll').textContent=money(p);
   $('stakedAll').textContent=money(staked);
   $('roiAll').textContent=(staked?(p/staked*100):0).toFixed(2)+'%';
-  $('plToday').title='Uses bet placement time. Legacy bets from before date tracking was added are treated as placed today.';
+  $('plToday').title='Based on when bets were settled in the rolling last 24 hours. Older bets without a settlement timestamp use their saved date.';
 
   const sportStats={};
   bets.forEach(b=>{const sport=(b.sport&&String(b.sport).trim())?String(b.sport).trim():'Unassigned / no sport';if(!sportStats[sport])sportStats[sport]={pnl:0,staked:0,count:0};sportStats[sport].pnl+=Number(b.pnl)||0;sportStats[sport].staked+=(b.stakeType==='free'?0:Number(b.st)||0);sportStats[sport].count++;});
@@ -604,7 +606,7 @@ function settleOpen(i){
     const credit=(Number(b.exposure)||0)+pnl;
     accounts[ai].balance=Number((accounts[ai].balance+credit).toFixed(2));
   }
-  bets.push({s:b.s,sport:b.sport||'',st:totalStake,o:b.o,pnl,date:b.created||Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:b.account|| (accounts[ai]&&accounts[ai].name)});
+  bets.push({s:b.s,sport:b.sport||'',st:totalStake,o:b.o,pnl,date:b.created||Date.now(),settledAt:Date.now(),result:r,bt:b.bt,stakeType:b.stakeType||'cash',ewf:b.ewf||null,ewp:b.ewp||null,account:b.account|| (accounts[ai]&&accounts[ai].name)});
   openBets.splice(i,1);
   renderAccounts();render();
 }
