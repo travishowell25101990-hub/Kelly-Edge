@@ -272,8 +272,21 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
       <div class="muted small" style="margin-top:8px">Enter total purchase cost and current value. Dividends and any eventual sale details can be recorded on each investment below.</div>
     </div>
     <div class="card">
-      <div class="muted small">YOUR SHARES</div><div id="shareRows"></div>
+      <div class="muted small">SELL AN INVESTMENT</div>
+      <label>Share / investment</label><select id="saleShareSelect" onchange="updateSalePurchaseCost()"></select>
+      <div class="grid"><div><label>Original purchase cost (£)</label><input id="salePurchaseCost" type="number" readonly></div><div><label>Sale proceeds received (£)</label><input id="saleProceedsInput" type="number" min="0" step="0.01" placeholder="e.g. 575.00"></div></div>
+      <label>Sale date</label><input id="saleDateInput" type="date">
+      <button style="width:100%;margin-top:10px" onclick="recordShareSale()">Record sale</button>
+      <div class="muted small" style="margin-top:8px">Sale proceeds and realised profit/loss will be included in the investment summary above.</div>
     </div>
+    <div class="card">
+      <div class="muted small">RECORD A DIVIDEND</div>
+      <label>Share / company</label><select id="dividendShareSelect"></select>
+      <label>Dividend received (£)</label><input id="dividendAmountInput" type="number" min="0.01" step="0.01" placeholder="e.g. 12.50">
+      <button style="width:100%;margin-top:10px" onclick="recordShareDividend()">Add dividend</button>
+    </div>
+    <div class="card"><div class="muted small">DIVIDENDS BY COMPANY</div><div id="dividendCompanyRows"></div></div>
+    <div class="card"><div class="muted small">YOUR SHARES</div><div id="shareRows"></div></div>
   </section>
 
   <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only. Bankroll includes the Bank account. Withdrawals reduce bankroll but are excluded from betting P/L. Each-way bets settle as WIN, PLACE, LOSS or VOID.</div>
@@ -443,24 +456,48 @@ function addShare(){
  $('shareName').value='';$('shareCostInput').value='';$('shareCurrentInput').value='';renderShares();
 }
 function updateShare(id,field,value){
- const s=shares.find(x=>String(x.id)===String(id));if(!s)return;
- if(field==='saleDate'){s.saleDate=value||'';if(!s.saleDate){s.saleAmount=null;}}
- else {const n=Number(value);if(!Number.isFinite(n)||n<0||(field==='cost'&&n<=0)){alert('Enter a valid non-negative value; purchase value must be above zero.');renderShares();return;}s[field]=Number(n.toFixed(2));}
- if(field==='saleAmount' && value!=='' && !s.saleDate){alert('Enter the sale date as well as the sale proceeds.');s.saleAmount=null;}
- if(s.saleDate && (s.saleAmount===null||s.saleAmount===undefined||s.saleAmount==='')){s.saleAmount=0;}
- renderShares();
+ const sh=shares.find(x=>String(x.id)===String(id));if(!sh)return;
+ const n=Number(value);if(!Number.isFinite(n)||n<0||(field==='cost'&&n<=0)){alert('Enter a valid non-negative value; purchase value must be above zero.');renderShares();return;}
+ sh[field]=Number(n.toFixed(2));renderShares();
+}
+function updateSalePurchaseCost(){
+ const sh=shares.find(x=>String(x.id)===String($('saleShareSelect').value));
+ $('salePurchaseCost').value=sh?Number(sh.cost||0).toFixed(2):'';
+ if(sh && sh.saleDate){$('saleDateInput').value=sh.saleDate;$('saleProceedsInput').value=Number(sh.saleAmount||0).toFixed(2);}else{$('saleDateInput').value='';$('saleProceedsInput').value='';}
+}
+function recordShareSale(){
+ const sh=shares.find(x=>String(x.id)===String($('saleShareSelect').value));
+ const proceeds=Number($('saleProceedsInput').value), date=$('saleDateInput').value;
+ if(!sh){alert('Add or select an investment first.');return;}
+ if(!date||$('saleProceedsInput').value===''||!Number.isFinite(proceeds)||proceeds<0){alert('Enter the sale date and valid sale proceeds.');return;}
+ if(sh.saleDate && !confirm('This investment is already marked as sold. Replace its sale details?'))return;
+ sh.saleDate=date;sh.saleAmount=Number(proceeds.toFixed(2));
+ $('saleProceedsInput').value='';$('saleDateInput').value='';renderShares();
+ alert('Sale recorded.');
+}
+function recordShareDividend(){
+ const sh=shares.find(x=>String(x.id)===String($('dividendShareSelect').value));
+ const amount=Number($('dividendAmountInput').value);
+ if(!sh||$('dividendAmountInput').value===''||!Number.isFinite(amount)||amount<=0){alert('Select a share and enter a dividend greater than zero.');return;}
+ sh.dividends=Number(((Number(sh.dividends)||0)+amount).toFixed(2));
+ $('dividendAmountInput').value='';renderShares();alert('Dividend recorded.');
 }
 function deleteShare(id){if(!confirm('Delete this investment record?'))return;shares=shares.filter(s=>String(s.id)!==String(id));renderShares();}
 function renderShares(){
- // Backfill fields for investments created by older versions.
- shares.forEach(s=>{if(s.dividends===undefined)s.dividends=0;if(s.saleDate===undefined)s.saleDate='';if(s.saleAmount===undefined)s.saleAmount=null;});
- const cost=shares.reduce((sum,s)=>sum+(Number(s.cost)||0),0);
- const value=shares.reduce((sum,s)=>sum+(s.saleDate?0:(Number(s.current)||0)),0);
- const sales=shares.reduce((sum,s)=>sum+(s.saleDate?(Number(s.saleAmount)||0):0),0);
- const dividends=shares.reduce((sum,s)=>sum+(Number(s.dividends)||0),0);
+ shares.forEach(sh=>{if(sh.dividends===undefined)sh.dividends=0;if(sh.saleDate===undefined)sh.saleDate='';if(sh.saleAmount===undefined)sh.saleAmount=null;});
+ const cost=shares.reduce((sum,sh)=>sum+(Number(sh.cost)||0),0);
+ const value=shares.reduce((sum,sh)=>sum+(sh.saleDate?0:(Number(sh.current)||0)),0);
+ const sales=shares.reduce((sum,sh)=>sum+(sh.saleDate?(Number(sh.saleAmount)||0):0),0);
+ const dividends=shares.reduce((sum,sh)=>sum+(Number(sh.dividends)||0),0);
  const pnl=value+sales+dividends-cost, ret=cost?pnl/cost*100:0;
  $('sharesCost').textContent=money(cost);$('sharesValue').textContent=money(value);$('sharesSales').textContent=money(sales);$('sharesDividends').textContent=money(dividends);$('sharesPnl').textContent=money(pnl);$('sharesPnl').className=pnl>=0?'good':'bad';$('sharesReturn').textContent=ret.toFixed(2)+'%';$('sharesReturn').className=ret>=0?'good':'bad';
- $('shareRows').innerHTML=shares.length?shares.map(s=>{const sold=!!s.saleDate;const p=(sold?(Number(s.saleAmount)||0): (Number(s.current)||0))+(Number(s.dividends)||0)-(Number(s.cost)||0);return `<div style="padding:10px 0;border-bottom:1px solid #252c37"><div class="row"><b>${escapeHtml(s.name)}${sold?' — SOLD':''}</b><b class="${p>=0?'good':'bad'}">${money(p)}</b></div><div class="grid"><div><label>Total purchase value (£)</label><input type="number" min="0.01" step="0.01" value="${Number(s.cost).toFixed(2)}" onchange="updateShare('${s.id}','cost',this.value)"></div><div><label>${sold?'Value at sale (£)':'Current value (£)'}</label><input type="number" min="0" step="0.01" value="${sold?Number(s.saleAmount||0).toFixed(2):Number(s.current||0).toFixed(2)}" ${sold?'disabled':''} onchange="updateShare('${s.id}','current',this.value)"></div><div><label>Total dividends received (£)</label><input type="number" min="0" step="0.01" value="${Number(s.dividends||0).toFixed(2)}" onchange="updateShare('${s.id}','dividends',this.value)"></div><div><label>Sale date (leave blank if still held)</label><input type="date" value="${escapeHtml(s.saleDate||'')}" onchange="updateShare('${s.id}','saleDate',this.value)"></div><div><label>Sale proceeds received (£)</label><input type="number" min="0" step="0.01" value="${s.saleAmount===null||s.saleAmount===undefined?'':Number(s.saleAmount||0).toFixed(2)}" ${!sold?'disabled':''} onchange="updateShare('${s.id}','saleAmount',this.value)"></div></div><div class="row"><span class="muted small">P/L including dividends${sold?' and sale proceeds':''}</span><b class="${p>=0?'good':'bad'}">${money(p)}</b></div><button style="width:100%;margin-top:6px" onclick="deleteShare('${s.id}')">Delete investment</button></div>`}).join(''):'<div class="muted small">No shares added yet.</div>';
+ const options=shares.map(sh=>`<option value="${sh.id}">${escapeHtml(sh.name)}${sh.saleDate?' — SOLD':''}</option>`).join('');
+ $('saleShareSelect').innerHTML=options||'<option value="">Add an investment first</option>';
+ $('dividendShareSelect').innerHTML=shares.map(sh=>`<option value="${sh.id}">${escapeHtml(sh.name)}</option>`).join('')||'<option value="">Add an investment first</option>';
+ updateSalePurchaseCost();
+ const byCompany={};shares.forEach(sh=>{byCompany[sh.name]=(byCompany[sh.name]||0)+(Number(sh.dividends)||0);});
+ $('dividendCompanyRows').innerHTML=Object.keys(byCompany).length?Object.entries(byCompany).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,total])=>`<div class="row"><span>${escapeHtml(name)}</span><b>${money(total)}</b></div>`).join(''):'<div class="muted small">No dividends recorded yet.</div>';
+ $('shareRows').innerHTML=shares.length?shares.map(sh=>{const sold=!!sh.saleDate;const p=(sold?(Number(sh.saleAmount)||0):(Number(sh.current)||0))+(Number(sh.dividends)||0)-(Number(sh.cost)||0);return `<div style="padding:10px 0;border-bottom:1px solid #252c37"><div class="row"><b>${escapeHtml(sh.name)}${sold?' — SOLD':''}</b><b class="${p>=0?'good':'bad'}">${money(p)}</b></div><div class="grid"><div><label>Total purchase value (£)</label><input type="number" min="0.01" step="0.01" value="${Number(sh.cost||0).toFixed(2)}" onchange="updateShare('${sh.id}','cost',this.value)"></div><div><label>${sold?'Sale proceeds (£)':'Current value (£)'}</label><input type="number" min="0" step="0.01" value="${sold?Number(sh.saleAmount||0).toFixed(2):Number(sh.current||0).toFixed(2)}" ${sold?'disabled':''} onchange="updateShare('${sh.id}','current',this.value)"></div></div><div class="row"><span class="muted small">Dividends received</span><span>${money(sh.dividends||0)}</span></div>${sold?`<div class="muted small">Sold on ${escapeHtml(sh.saleDate)}</div>`:''}<div class="row"><span class="muted small">P/L including dividends</span><b class="${p>=0?'good':'bad'}">${money(p)}</b></div><button style="width:100%;margin-top:6px" onclick="deleteShare('${sh.id}')">Delete investment</button></div>`}).join(''):'<div class="muted small">No shares added yet.</div>';
  saveShares();
 }
 
