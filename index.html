@@ -30,6 +30,8 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
     <button id="tAccounts" onclick="tab('accounts')">Accounts</button>
     <button id="tAntepost" onclick="tab('antepost')">Ante-post</button>
     <button id="tSports" onclick="tab('sports')">Sports P/L</button>
+    <button id="tDebt" onclick="tab('debt')">Debt</button>
+    <button id="tShares" onclick="tab('shares')">Shares</button>
   </div>
 
   <section id="kelly" class="panel">
@@ -218,12 +220,66 @@ button.active{background:#f4f6f8;color:#101318}.result{font-size:30px;font-weigh
       <div id="withdrawalRows"></div>
     </div>
   </section>
+  <section id="debt" class="panel" style="display:none">
+    <div class="card">
+      <div class="muted small">OVERALL DEBT</div>
+      <div class="result" id="debtTotal">£0.00</div>
+      <div class="muted small">Current combined balance across all debt accounts.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">ADD DEBT ACCOUNT</div>
+      <label>Account / lender name</label><input id="debtName" placeholder="e.g. Credit card, loan, finance">
+      <label>Current starting balance (£)</label><input id="debtStarting" type="number" min="0" step="0.01" placeholder="e.g. 1500.00">
+      <button style="width:100%;margin-top:10px" onclick="addDebtAccount()">Add debt account</button>
+    </div>
+    <div class="card">
+      <div class="muted small">RECORD A CHANGE</div>
+      <label>Debt account</label><select id="debtAccountSelect"></select>
+      <div class="grid">
+        <div><label>Change type</label><select id="debtChangeType"><option value="deduction">Deduction / payment</option><option value="addition">Addition / interest / new borrowing</option></select></div>
+        <div><label>Amount (£)</label><input id="debtChangeAmount" type="number" min="0.01" step="0.01" placeholder="e.g. 100.00"></div>
+      </div>
+      <label>Note (optional)</label><input id="debtChangeNote" placeholder="e.g. monthly payment / interest">
+      <button style="width:100%;margin-top:10px" onclick="recordDebtChange()">Record change</button>
+      <div class="muted small" style="margin-top:8px">Payments reduce debt; additions increase it. Each change records the account balance and overall debt afterwards.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">DEBT ACCOUNTS</div><div id="debtAccountRows"></div>
+    </div>
+    <div class="card">
+      <div class="muted small">DEBT HISTORY — NEWEST FIRST</div><div id="debtHistoryRows"></div>
+    </div>
+  </section>
+
+  <section id="shares" class="panel" style="display:none">
+    <div class="card">
+      <div class="muted small">INVESTMENT SUMMARY</div>
+      <div class="row"><span>Total cost of investment</span><b id="sharesCost">£0.00</b></div>
+      <div class="row"><span>Current total value</span><b id="sharesValue">£0.00</b></div>
+      <div class="row"><span>Overall profit / loss</span><b id="sharesPnl">£0.00</b></div>
+      <div class="row"><span>Overall return</span><b id="sharesReturn">0.00%</b></div>
+    </div>
+    <div class="card">
+      <div class="muted small">ADD SHARE / INVESTMENT</div>
+      <label>Share name</label><input id="shareName" placeholder="e.g. Barclays">
+      <div class="grid">
+        <div><label>Total purchase value (£)</label><input id="shareCostInput" type="number" min="0.01" step="0.01" placeholder="e.g. 500.00"></div>
+        <div><label>Current value (£)</label><input id="shareCurrentInput" type="number" min="0" step="0.01" placeholder="e.g. 575.00"></div>
+      </div>
+      <button style="width:100%;margin-top:10px" onclick="addShare()">Add investment</button>
+      <div class="muted small" style="margin-top:8px">Enter the total amount invested and the current total market value. No share quantity or individual purchase prices are required.</div>
+    </div>
+    <div class="card">
+      <div class="muted small">YOUR SHARES</div><div id="shareRows"></div>
+    </div>
+  </section>
+
   <div class="foot">Calculations are estimates. Open bets are tracked by entry odds and stake only. Bankroll includes the Bank account. Withdrawals reduce bankroll but are excluded from betting P/L. Each-way bets settle as WIN, PLACE, LOSS or VOID.</div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
 function money(x){return '£'+(Number(x)||0).toFixed(2)}
-function tab(x){['kelly','value','arb','tracker','accounts','antepost','sports'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts','tAntepost','tSports'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
+function tab(x){['kelly','value','arb','tracker','accounts','antepost','sports','debt','shares'].forEach(n=>$(n).style.display=n===x?'block':'none');['tKelly','tValue','tArb','tTracker','tAccounts','tAntepost','tSports','tDebt','tShares'].forEach(n=>$(n).classList.remove('active'));$('t'+x[0].toUpperCase()+x.slice(1)).classList.add('active')}
 function calcKelly(){
  const B=+$('bank').value||0,O=+$('odds').value||0,P=(+$('prob').value||0)/100,F=+$('frac').value;
  if(O<=1){return}
@@ -276,6 +332,9 @@ if(!accounts.some(a=>a.name==='Cash Account')){accounts.push({name:'Cash Account
 if(!accounts.some(a=>a.name==="Dad's Paddy Power")){accounts.push({name:"Dad's Paddy Power",balance:0});localStorage.setItem('keAccounts',JSON.stringify(accounts));}
 let withdrawals=JSON.parse(localStorage.getItem('keWithdrawals')||'[]');
 let antepostBets=JSON.parse(localStorage.getItem('keAntepostBets')||'[]');
+let debtAccounts=JSON.parse(localStorage.getItem('keDebtAccounts')||'[]');
+let debtHistory=JSON.parse(localStorage.getItem('keDebtHistory')||'[]');
+let shares=JSON.parse(localStorage.getItem('keShares')||'[]');
 function accountTotal(){return accounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);}
 function refreshBankrollInputs(){
  const total=accountTotal();
@@ -348,6 +407,47 @@ function renderAntepost(){
  saveAntepost();
 }
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+
+function saveDebt(){localStorage.setItem('keDebtAccounts',JSON.stringify(debtAccounts));localStorage.setItem('keDebtHistory',JSON.stringify(debtHistory));}
+function debtTotal(){return debtAccounts.reduce((sum,a)=>sum+(Number(a.balance)||0),0);}
+function addDebtAccount(){
+ const name=$('debtName').value.trim(), balance=Number($('debtStarting').value);
+ if(!name||!Number.isFinite(balance)||balance<0){alert('Enter an account name and a valid starting balance.');return;}
+ if(debtAccounts.some(a=>a.name.toLowerCase()===name.toLowerCase())){alert('A debt account with that name already exists.');return;}
+ const account={id:Date.now()+Math.random(),name,balance:Number(balance.toFixed(2)),created:Date.now()};
+ debtAccounts.push(account);
+ debtHistory.push({id:Date.now()+Math.random(),accountId:account.id,account:name,type:'starting',amount:Number(balance.toFixed(2)),accountBalance:account.balance,overallBalance:debtTotal(),note:'Starting balance',date:Date.now()});
+ $('debtName').value='';$('debtStarting').value='';renderDebt();
+}
+function recordDebtChange(){
+ const id=$('debtAccountSelect').value, a=debtAccounts.find(x=>String(x.id)===String(id)), type=$('debtChangeType').value, amount=Number($('debtChangeAmount').value), note=$('debtChangeNote').value.trim();
+ if(!a||!Number.isFinite(amount)||amount<=0){alert('Select an account and enter an amount greater than zero.');return;}
+ a.balance=Number((a.balance+(type==='addition'?amount:-amount)).toFixed(2));
+ debtHistory.push({id:Date.now()+Math.random(),accountId:a.id,account:a.name,type,amount:Number(amount.toFixed(2)),accountBalance:a.balance,overallBalance:debtTotal(),note,date:Date.now()});
+ $('debtChangeAmount').value='';$('debtChangeNote').value='';renderDebt();
+}
+function renderDebt(){
+ $('debtTotal').textContent=money(debtTotal());
+ $('debtAccountSelect').innerHTML=debtAccounts.map(a=>`<option value="${a.id}">${escapeHtml(a.name)} — ${money(a.balance)}</option>`).join('');
+ $('debtAccountRows').innerHTML=debtAccounts.length?debtAccounts.map(a=>`<div class="row"><span>${escapeHtml(a.name)}</span><b>${money(a.balance)}</b></div>`).join(''):'<div class="muted small">No debt accounts added yet.</div>';
+ $('debtHistoryRows').innerHTML=debtHistory.length?debtHistory.slice().reverse().map(h=>{const label=h.type==='starting'?'Starting balance':h.type==='addition'?'Debt added':'Payment / deduction';const sign=h.type==='deduction'?'−':h.type==='addition'?'+':'';return `<div style="padding:9px 0;border-bottom:1px solid #252c37"><div class="row"><span><b>${escapeHtml(h.account)}</b><br><span class="muted small">${new Date(h.date).toLocaleString()} • ${label}${h.note?' • '+escapeHtml(h.note):''}</span></span><b>${sign}${money(h.amount)}</b></div><div class="row"><span class="muted small">Account balance after change</span><b>${money(h.accountBalance)}</b></div><div class="row"><span class="muted small">Overall debt after change</span><b>${money(h.overallBalance)}</b></div></div>`}).join(''):'<div class="muted small">No debt changes recorded yet.</div>';
+ saveDebt();
+}
+function saveShares(){localStorage.setItem('keShares',JSON.stringify(shares));}
+function addShare(){
+ const name=$('shareName').value.trim(), cost=Number($('shareCostInput').value), current=Number($('shareCurrentInput').value);
+ if(!name||!Number.isFinite(cost)||cost<=0||!Number.isFinite(current)||current<0){alert('Enter a share name, purchase value above zero, and a valid current value.');return;}
+ shares.push({id:Date.now()+Math.random(),name,cost:Number(cost.toFixed(2)),current:Number(current.toFixed(2)),created:Date.now()});
+ $('shareName').value='';$('shareCostInput').value='';$('shareCurrentInput').value='';renderShares();
+}
+function updateShare(id,field,value){const s=shares.find(x=>String(x.id)===String(id));if(!s)return;const n=Number(value);if(!Number.isFinite(n)||n<0||(field==='cost'&&n<=0)){alert('Enter a valid non-negative value; purchase value must be above zero.');renderShares();return;}s[field]=Number(n.toFixed(2));renderShares();}
+function deleteShare(id){if(!confirm('Delete this investment record?'))return;shares=shares.filter(s=>String(s.id)!==String(id));renderShares();}
+function renderShares(){
+ const cost=shares.reduce((sum,s)=>sum+(Number(s.cost)||0),0), value=shares.reduce((sum,s)=>sum+(Number(s.current)||0),0), pnl=value-cost, ret=cost?pnl/cost*100:0;
+ $('sharesCost').textContent=money(cost);$('sharesValue').textContent=money(value);$('sharesPnl').textContent=money(pnl);$('sharesPnl').className=pnl>=0?'good':'bad';$('sharesReturn').textContent=ret.toFixed(2)+'%';$('sharesReturn').className=ret>=0?'good':'bad';
+ $('shareRows').innerHTML=shares.length?shares.map(s=>{const p=(Number(s.current)||0)-(Number(s.cost)||0);return `<div style="padding:10px 0;border-bottom:1px solid #252c37"><div class="row"><b>${escapeHtml(s.name)}</b><b class="${p>=0?'good':'bad'}">${money(p)}</b></div><div class="grid"><div><label>Total purchase value (£)</label><input type="number" min="0.01" step="0.01" value="${Number(s.cost).toFixed(2)}" onchange="updateShare('${s.id}','cost',this.value)"></div><div><label>Current value (£)</label><input type="number" min="0" step="0.01" value="${Number(s.current).toFixed(2)}" onchange="updateShare('${s.id}','current',this.value)"></div></div><div class="row"><span class="muted small">Return</span><b class="${p>=0?'good':'bad'}">${(s.cost?p/s.cost*100:0).toFixed(2)}%</b></div><button style="width:100%;margin-top:6px" onclick="deleteShare('${s.id}')">Delete investment</button></div>`}).join(''):'<div class="muted small">No shares added yet.</div>';
+ saveShares();
+}
 
 function render(){
   let p=bets.reduce((a,b)=>a+b.pnl,0);
@@ -613,7 +713,7 @@ function settleOpen(i){
 
 function saveTrack(){/* bankroll is linked to account balances */}
 
-calcKelly();calcValue();calcArb();toggleEW();renderAccounts();render();renderAntepost();
+calcKelly();calcValue();calcArb();toggleEW();renderAccounts();render();renderAntepost();renderDebt();renderShares();
 </script>
 </body>
 </html>
